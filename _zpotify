@@ -1,0 +1,38 @@
+#compdef zpotify
+_zpotify() {
+    local state line
+    _arguments -s \
+        '1: :->cmd' \
+        '*: :->args'
+
+    case $state in
+    cmd)
+        main_commands=('print\:"Display current track info in a specific format" pause\:"Toggle pause state" prev\:"Skip to previous track" next\:"Skip to next track" repeat\:"Get/Set repeat mode" shuffle\:"Toggle shuffle mode" seek\:"Skip to a specific time (seconds) of the current track" vol\:"Get/Set volume" like\:"Add the current track to your liked songs" logout\:"Remove the stored credentials from the config file" help\:"Display information about a command" version\:"Display program version"')
+        main_commands=($main_commands)
+        _alternative "args:command:(($main_commands))"
+        ;;
+    args)
+        case $line[1] in
+        print)
+            format_options=('{title}\:"prints the title of the current track" {state}\:"prints the current playback state" {album}\:"prints the name of the current album" {artist}\:"prints the name of the first artist of the current track" {artists}\:"prints all artists" {device}\:"prints the name of the current device" {volume}\:"prints the current volume" {repeat}\:"prints the current repeat state" {shuffle}\:"prints the current shuffle state" {bar\\\:50}\:"prints a progress bar" {progress}\:"prints the current progress as min:sec" {duration}\:"prints the duration of the current track as min:sec" {url}\:"prints the url of the current track" {album_url}\:"prints the url of the current album"')
+            format_options=($format_options)
+            _arguments -s "*:format:(($format_options))"
+            ;;
+        repeat)
+            _arguments -s "2:repeat_mode:(track playlist off)"
+            ;;
+        seek)
+            _arguments -s "2:seconds:(0:00 $(zpotify print {duration} 2>/dev/null))"
+            ;;
+        vol)
+            _arguments -s "2:volume:(up down $(zpotify print {volume} 2>/dev/null))"
+            ;;
+        help)
+            _arguments -s "2:commands:(print pause prev next repeat shuffle seek vol like logout help version)"
+            ;;
+        esac
+        ;;
+    esac
+}
+
+compdef _zpotify zpotify

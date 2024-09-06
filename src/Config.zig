@@ -1,39 +1,64 @@
 const std = @import("std");
+const api = @import("api.zig");
 
 const Config = @This();
 
 authorization: []const u8,
 refresh_token: []const u8,
+access_token: []const u8,
+expiration: i64,
 allocator: std.mem.Allocator,
 
 const redirect_uri = "http://localhost:9999/callback";
 
-/// https://developer.spotify.com/documentation/web-api/concepts/scopes
-const scopes = [_][]const u8{
-    "user-read-playback-state",
-    "user-modify-playback-state",
-    "user-read-currently-playing",
-};
-
 const Json = struct {
     authorization: []const u8,
     refresh_token: []const u8,
+    access_token: []const u8,
+    expiration: i64,
 };
 
 pub fn init(allocator: std.mem.Allocator, client: *std.http.Client) !Config {
     const config_path = try Config.getPath(allocator);
     defer allocator.free(config_path);
     const cwd = std.fs.cwd();
-    const config_file = if (cwd.openFile(config_path, .{})) |config_file| blk: {
+    const config_file = if (cwd.openFile(config_path, .{ .mode = .read_write })) |config_file| blk: {
+        defer config_file.close();
         const content = try config_file.readToEndAlloc(allocator, 4096);
         defer allocator.free(content);
         if (std.json.parseFromSlice(Config.Json, allocator, content, .{})) |config_json| {
             defer config_json.deinit();
-            return .{
-                .authorization = try allocator.dupe(u8, config_json.value.authorization),
-                .refresh_token = try allocator.dupe(u8, config_json.value.refresh_token),
-                .allocator = allocator,
-            };
+
+            // if (isExpired)
+            if (config_json.value.expiration <= std.time.timestamp()) {
+                var config: Config = .{
+                    .authorization = try allocator.dupe(u8, config_json.value.authorization),
+                    .refresh_token = try allocator.dupe(u8, config_json.value.refresh_token),
+                    .access_token = undefined,
+                    .expiration = undefined,
+                    .allocator = allocator,
+                };
+                const payload = try std.fmt.allocPrint(
+                    allocator,
+                    "grant_type=refresh_token&refresh_token={s}",
+                    .{config.refresh_token},
+                );
+                defer allocator.free(payload);
+                if (try config.getToken(client, payload)) |new_refresh_token| {
+                    allocator.free(config.refresh_token);
+                    config.refresh_token = new_refresh_token;
+                }
+                try config.updateConfigFile(config_file);
+                return config;
+            } else {
+                return .{
+                    .authorization = try allocator.dupe(u8, config_json.value.authorization),
+                    .refresh_token = try allocator.dupe(u8, config_json.value.refresh_token),
+                    .access_token = try allocator.dupe(u8, config_json.value.access_token),
+                    .expiration = config_json.value.expiration,
+                    .allocator = allocator,
+                };
+            }
         } else |err| {
             std.log.warn("Failed to parse the configuration file: {}", .{err});
             break :blk try cwd.createFile(config_path, .{});
@@ -45,6 +70,7 @@ pub fn init(allocator: std.mem.Allocator, client: *std.http.Client) !Config {
         try cwd.makePath(config_path[0 .. config_path.len - "config.json".len]);
         break :blk try cwd.createFile(config_path, .{});
     };
+    defer config_file.close();
 
     const stdout = std.io.getStdOut().writer();
     try stdout.writeAll("Welcome to zpotify!\n");
@@ -73,35 +99,31 @@ pub fn init(allocator: std.mem.Allocator, client: *std.http.Client) !Config {
     };
     errdefer allocator.free(authorization);
 
-    // TODO: cache access token (from getRefreshToken()) in this struct
-    const refresh_token = try getRefreshToken(allocator, client, auth_code, authorization);
-    defer allocator.free(refresh_token);
-
-    const config_json: Config.Json = .{
+    var config: Config = .{
         .authorization = authorization,
-        .refresh_token = refresh_token,
-    };
-
-    try config_file.seekTo(0);
-    var ws = std.json.writeStream(config_file.writer(), .{});
-    defer ws.deinit();
-    try ws.write(config_json);
-
-    std.log.info("Your information has been saved to '{s}'.", .{config_path});
-
-    // TODO: crash if trying to get the access token with a too recent refresh token
-    std.process.exit(0);
-
-    return .{
-        .authorization = authorization,
-        .refresh_token = refresh_token,
+        .refresh_token = undefined,
+        .access_token = undefined,
+        .expiration = undefined,
         .allocator = allocator,
     };
+    const payload = try std.fmt.allocPrint(
+        allocator,
+        "grant_type=authorization_code&code={s}&redirect_uri=" ++ redirect_uri,
+        .{auth_code},
+    );
+    defer allocator.free(payload);
+    config.refresh_token = (try config.getToken(client, payload)).?;
+
+    try config.updateConfigFile(config_file);
+    std.log.info("Your information has been saved to '{s}'.", .{config_path});
+
+    return config;
 }
 
 pub fn deinit(self: Config) void {
     self.allocator.free(self.authorization);
     self.allocator.free(self.refresh_token);
+    self.allocator.free(self.access_token);
 }
 
 // TODO: windows
@@ -113,6 +135,17 @@ pub fn getPath(allocator: std.mem.Allocator) ![]const u8 {
     } else {
         return error.EnvironmentVariableNotFound;
     }
+}
+
+fn updateConfigFile(self: Config, file: std.fs.File) !void {
+    const config_json: Config.Json = .{
+        .authorization = self.authorization,
+        .refresh_token = self.refresh_token,
+        .access_token = self.access_token,
+        .expiration = self.expiration,
+    };
+    try file.seekTo(0);
+    try std.json.stringify(config_json, .{}, file.writer());
 }
 
 fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
@@ -150,9 +183,9 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     const scope = comptime blk: {
         const separator = "+";
         var buf: [4096]u8 = undefined;
-        @memcpy(buf[0..scopes[0].len], scopes[0]);
-        var size: usize = scopes[0].len;
-        for (scopes[1..]) |scope| {
+        @memcpy(buf[0..api.scopes[0].len], api.scopes[0]);
+        var size: usize = api.scopes[0].len;
+        for (api.scopes[1..]) |scope| {
             @memcpy(buf[size .. size + separator.len], separator);
             size += separator.len;
             @memcpy(buf[size .. size + scope.len], scope);
@@ -208,23 +241,10 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     return allocator.dupe(u8, response[start..end]);
 }
 
-fn getRefreshToken(
-    allocator: std.mem.Allocator,
-    client: *std.http.Client,
-    auth_code: []const u8,
-    auth: []const u8,
-) ![]const u8 {
+fn getToken(self: *Config, client: *std.http.Client, payload: []const u8) !?[]const u8 {
     const uri = try std.Uri.parse("https://accounts.spotify.com/api/token");
-
-    const body = try std.fmt.allocPrint(
-        allocator,
-        "grant_type=authorization_code&code={s}&redirect_uri=" ++ redirect_uri,
-        .{auth_code},
-    );
-    defer allocator.free(body);
-
-    const auth_header = try std.fmt.allocPrint(allocator, "Basic {s}", .{auth});
-    defer allocator.free(auth_header);
+    const auth_header = try std.fmt.allocPrint(self.allocator, "Basic {s}", .{self.authorization});
+    defer self.allocator.free(auth_header);
 
     var header_buf: [4096]u8 = undefined;
     var req = try client.open(.POST, uri, .{
@@ -235,34 +255,46 @@ fn getRefreshToken(
         },
     });
     defer req.deinit();
-    req.transfer_encoding = .{ .content_length = body.len };
+    req.transfer_encoding = .{ .content_length = payload.len };
     try req.send();
-    try req.writeAll(body);
+    try req.writeAll(payload);
     try req.finish();
     try req.wait();
 
-    std.log.debug("getRefreshToken(): Response status: {s} ({d})", .{
+    std.log.debug("getToken(): Response status: {s} ({d})", .{
         @tagName(req.response.status),
         @intFromEnum(req.response.status),
     });
 
+    const response = try req.reader().readAllAlloc(self.allocator, 4096);
+    defer self.allocator.free(response);
+
     if (req.response.status != .ok) {
+        const Response = struct {
+            @"error": ?[]const u8 = null,
+            error_description: ?[]const u8 = null,
+        };
+        const json = try std.json.parseFromSlice(Response, self.allocator, response, .{});
+        defer json.deinit();
+        std.log.err("{?s} ({?s})", .{ json.value.error_description, json.value.@"error" });
         return error.BadResponse;
+    } else {
+        const Response = struct {
+            access_token: []const u8,
+            token_type: []const u8,
+            expires_in: u64,
+            scope: []const u8,
+            refresh_token: ?[]const u8 = null,
+        };
+        const json = try std.json.parseFromSlice(Response, self.allocator, response, .{});
+        defer json.deinit();
+
+        self.access_token = try self.allocator.dupe(u8, json.value.access_token);
+        self.expiration = std.time.timestamp() + @as(i64, @intCast(json.value.expires_in));
+        if (json.value.refresh_token) |refresh_token| {
+            return try self.allocator.dupe(u8, refresh_token);
+        } else {
+            return null;
+        }
     }
-
-    const response = try req.reader().readAllAlloc(allocator, 4096);
-    defer allocator.free(response);
-
-    const Response = struct {
-        access_token: []const u8,
-        token_type: []const u8,
-        expires_in: u64,
-        scope: []const u8,
-        refresh_token: []const u8,
-    };
-
-    const json = try std.json.parseFromSlice(Response, allocator, response, .{});
-    defer json.deinit();
-
-    return allocator.dupe(u8, json.value.refresh_token);
 }
