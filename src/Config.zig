@@ -194,6 +194,7 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
         break :blk buf[0..size];
     };
 
+    // useless
     const escaped_redirect_uri = comptime blk: {
         var buffer: [4096]u8 = undefined;
         const size = std.mem.replacementSize(u8, redirect_uri, "/", "%2F");

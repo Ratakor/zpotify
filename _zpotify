@@ -34,5 +34,3 @@ _zpotify() {
         ;;
     esac
 }
-
-compdef _zpotify zpotify

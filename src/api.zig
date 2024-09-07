@@ -15,6 +15,7 @@ pub const scopes = [_][]const u8{
 pub const Request = enum {
     // GET
     playback_state,
+    search,
 
     // PUT
     play,
@@ -31,7 +32,7 @@ pub const Request = enum {
 
     pub fn method(comptime self: Request) std.http.Method {
         return comptime switch (self) {
-            .playback_state => .GET,
+            .playback_state, .search => .GET,
             .play, .pause, .repeat, .seek, .shuffle, .volume, .like => .PUT,
             .next, .prev => .POST,
         };
@@ -40,6 +41,7 @@ pub const Request = enum {
     pub fn ResponseType(comptime self: Request) type {
         return comptime switch (self) {
             .playback_state => PlaybackState,
+            .search => Search,
             .play => Play,
             .pause => Pause,
             .repeat => Repeat,
@@ -82,29 +84,6 @@ pub const Track = struct {
     is_local: bool = false,
 };
 
-pub const Album = struct {
-    album_type: []const u8,
-    total_tracks: u64,
-    available_markets: []const []const u8,
-    external_urls: ExternalUrl,
-    href: []const u8,
-    id: []const u8,
-    images: []const struct {
-        url: []const u8,
-        height: ?u64 = null,
-        width: ?u64 = null,
-    },
-    name: []const u8,
-    release_date: []const u8,
-    release_date_precision: []const u8,
-    restrictions: ?struct {
-        reason: ?[]const u8 = null,
-    } = null,
-    type: []const u8,
-    uri: []const u8,
-    artists: []const Artist,
-};
-
 pub const Artist = struct {
     external_urls: ExternalUrl = .{},
     href: ?[]const u8 = null,
@@ -114,8 +93,63 @@ pub const Artist = struct {
     uri: ?[]const u8 = null,
 };
 
+pub const Album = struct {
+    album_type: []const u8,
+    total_tracks: u64,
+    available_markets: []const []const u8,
+    external_urls: ExternalUrl,
+    href: []const u8,
+    id: []const u8,
+    images: []const Image,
+    name: []const u8,
+    release_date: []const u8,
+    release_date_precision: []const u8,
+    restrictions: ?struct {
+        reason: ?[]const u8 = null,
+    } = null,
+    type: []const u8 = "album",
+    uri: []const u8,
+    artists: []const Artist,
+};
+
+pub const Playlist = struct {
+    collaborative: ?bool = null,
+    description: ?[]const u8 = null,
+    external_urls: ExternalUrl = .{},
+    href: ?[]const u8 = null,
+    id: ?[]const u8 = null,
+    images: []const Image = &[_]Image{},
+    name: []const u8 = "playlist_name",
+    owner: ?struct {
+        external_urls: ExternalUrl = .{},
+        followers: ?struct {
+            href: ?[]const u8 = null, // nullable
+            total: ?u64 = null,
+        } = null,
+        href: ?[]const u8 = null,
+        id: ?[]const u8 = null,
+        type: []const u8 = "user",
+        uri: ?[]const u8 = null,
+        display_name: ?[]const u8 = null, // nullable
+    } = null,
+    public: ?bool = null,
+    snapshot_id: ?[]const u8 = null,
+    tracks: ?struct {
+        href: ?[]const u8 = null,
+        total: ?u64 = null,
+    } = null,
+    type: []const u8 = "playlist",
+    uri: ?[]const u8 = null,
+};
+
 pub const ExternalUrl = struct {
     spotify: []const u8 = "https://open.spotify.com",
+};
+
+pub const Image = struct {
+    url: []const u8,
+    height: ?u64,
+    width: ?u64,
 };
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
@@ -146,6 +180,51 @@ pub const PlaybackState = struct {
     // actions...
 
     const request = "/me/player";
+};
+
+/// https://developer.spotify.com/documentation/web-api/reference/search
+pub const Search = struct {
+    tracks: struct {
+        href: []const u8,
+        limit: u64,
+        next: ?[]const u8,
+        offset: u64,
+        previous: ?[]const u8,
+        total: u64,
+        items: []const Track,
+    },
+    artists: struct {
+        href: []const u8,
+        limit: u64,
+        next: ?[]const u8,
+        offset: u64,
+        previous: ?[]const u8,
+        total: u64,
+        items: []const Artist,
+    },
+    albums: struct {
+        href: []const u8,
+        limit: u64,
+        next: ?[]const u8,
+        offset: u64,
+        previous: ?[]const u8,
+        total: u64,
+        items: []const Album,
+    },
+    playlists: struct {
+        href: []const u8,
+        limit: u64,
+        next: ?[]const u8,
+        offset: u64,
+        previous: ?[]const u8,
+        total: u64,
+        items: []const Playlist,
+    },
+    // shows...
+    // episodes...
+    // audiobooks...
+
+    const request = "/search" ++ "?q={s}&type={s}";
 };
 
 /// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
@@ -284,11 +363,7 @@ pub fn put(
     });
 
     switch (req.response.status) {
-        .ok => return,
-        .no_content => {
-            std.log.warn("Playback not available or active (204)", .{});
-            return; // TODO: error.NotPlaying;
-        },
+        .ok, .no_content, .created, .accepted => return,
         else => {
             const response = try req.reader().readAllAlloc(allocator, 4096);
             defer allocator.free(response);
