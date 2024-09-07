@@ -57,40 +57,26 @@ fn escapeDefaultFormat() []const u8 {
     }
 }
 
-pub fn exec(
-    allocator: std.mem.Allocator,
-    args: *std.process.ArgIterator,
-    client: *std.http.Client,
-    access_token: []const u8,
-) !void {
-    const fmt = blk: {
-        var array_list = std.ArrayList(u8).init(allocator);
-        defer array_list.deinit();
-        try array_list.appendSlice(args.next() orelse default_format);
-        while (args.next()) |arg| {
-            try array_list.appendSlice(arg);
-        }
-        break :blk try array_list.toOwnedSlice();
-    };
-    defer allocator.free(fmt);
-
-    const playback_state = api.get(
-        .playback_state,
-        allocator,
-        client,
-        access_token,
-    ) catch |err| switch (err) {
+pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
+    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
         error.NotPlaying => return,
         else => return err,
     };
     defer playback_state.deinit();
 
-    std.log.debug("format: '{s}'", .{fmt});
-
     const stdout = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout);
     const writer = bw.writer();
-    try format(writer, fmt, playback_state.value);
+
+    if (args.next()) |arg2| {
+        try format(writer, arg2, playback_state.value);
+        while (args.next()) |arg| {
+            try format(writer, arg, playback_state.value);
+        }
+    } else {
+        try format(writer, default_format, playback_state.value);
+    }
+
     try bw.flush();
 }
 
@@ -201,28 +187,22 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
         }
     } else if (std.mem.eql(u8, arg, "artist")) {
         if (info.item) |track| {
-            if (track.artists.len > 0) {
-                try writer.print("{s}", .{track.artists[0].name});
-            } else {
-                try writer.writeAll("null");
-            }
+            // assume at least one artist
+            try writer.writeAll(track.artists[0].name);
         } else {
             try writer.writeAll("null");
         }
     } else if (std.mem.startsWith(u8, arg, "artists")) {
-        const sep = blk: {
-            const idx = std.mem.indexOfScalar(u8, arg, ':') orelse break :blk ", ";
-            if (idx == arg.len) break :blk "";
-            break :blk arg[idx + 1 ..];
-        };
         if (info.item) |track| {
-            if (track.artists.len > 0) {
-                try writer.print("{s}", .{track.artists[0].name});
-                for (track.artists[1..]) |artist| {
-                    try writer.print("{s}{s}", .{ sep, artist.name });
-                }
-            } else {
-                try writer.writeAll("null");
+            const sep = blk: {
+                const idx = std.mem.indexOfScalar(u8, arg, ':') orelse break :blk ", ";
+                if (idx == arg.len) break :blk "";
+                break :blk arg[idx + 1 ..];
+            };
+            // assume at least one artist
+            try writer.writeAll(track.artists[0].name);
+            for (track.artists[1..]) |artist| {
+                try writer.print("{s}{s}", .{ sep, artist.name });
             }
         } else {
             try writer.writeAll("null");
@@ -235,12 +215,12 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
         }
     } else if (std.mem.eql(u8, arg, "device")) {
         if (info.device) |device| {
-            try writer.print("{s}", .{device.name});
+            try writer.writeAll(device.name);
         } else {
             try writer.writeAll("null");
         }
     } else if (std.mem.eql(u8, arg, "repeat")) {
-        try writer.print("{s}", .{info.repeat_state});
+        try writer.writeAll(info.repeat_state);
     } else if (std.mem.eql(u8, arg, "shuffle")) {
         if (info.shuffle_state) {
             try writer.writeAll("on");
@@ -251,11 +231,7 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
         try writeTime(writer, info.progress_ms);
     } else if (std.mem.eql(u8, arg, "album")) {
         if (info.item) |track| {
-            if (track.album) |album| {
-                try writer.print("{s}", .{album.name});
-            } else {
-                try writer.writeAll("null");
-            }
+            try writer.writeAll(track.album.name);
         } else {
             try writer.writeAll("null");
         }
@@ -273,11 +249,7 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
         }
     } else if (std.mem.eql(u8, arg, "album_url")) {
         if (info.item) |track| {
-            if (track.album) |album| {
-                try writer.writeAll(album.external_urls.spotify);
-            } else {
-                try writer.writeAll("null");
-            }
+            try writer.writeAll(track.album.external_urls.spotify);
         } else {
             try writer.writeAll("null");
         }

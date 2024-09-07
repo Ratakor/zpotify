@@ -1,7 +1,7 @@
 //! https://developer.spotify.com/documentation/web-api/reference
-// TODO: refactor
 
 const std = @import("std");
+pub const Client = @import("Client.zig");
 
 const api_url = "https://api.spotify.com/v1";
 
@@ -12,52 +12,9 @@ pub const scopes = [_][]const u8{
     "user-library-modify",
 };
 
-pub const Request = enum {
-    // GET
-    playback_state,
-    search,
-
-    // PUT
-    play,
-    pause,
-    repeat,
-    seek,
-    shuffle,
-    volume,
-    like,
-
-    // POST
-    next,
-    prev,
-
-    pub fn method(comptime self: Request) std.http.Method {
-        return comptime switch (self) {
-            .playback_state, .search => .GET,
-            .play, .pause, .repeat, .seek, .shuffle, .volume, .like => .PUT,
-            .next, .prev => .POST,
-        };
-    }
-
-    pub fn ResponseType(comptime self: Request) type {
-        return comptime switch (self) {
-            .playback_state => PlaybackState,
-            .search => Search,
-            .play => Play,
-            .pause => Pause,
-            .repeat => Repeat,
-            .seek => Seek,
-            .shuffle => Shuffle,
-            .volume => Volume,
-            .like => Like,
-            .next => Next,
-            .prev => Prev,
-        };
-    }
-};
-
 pub const Track = struct {
-    album: ?Album = null,
-    artists: []const Artist = &[_]Artist{},
+    album: Album,
+    artists: []const Artist,
     available_markets: ?[]const []const u8 = null,
     disc_number: ?u64 = null,
     duration_ms: u64 = 0,
@@ -67,7 +24,7 @@ pub const Track = struct {
         ean: ?[]const u8 = null,
         upc: ?[]const u8 = null,
     } = null,
-    external_urls: ExternalUrl = .{},
+    external_urls: ExternalUrls = .{},
     href: ?[]const u8 = null,
     id: []const u8,
     is_playable: ?bool = null,
@@ -85,7 +42,7 @@ pub const Track = struct {
 };
 
 pub const Artist = struct {
-    external_urls: ExternalUrl = .{},
+    external_urls: ExternalUrls = .{},
     href: ?[]const u8 = null,
     id: ?[]const u8 = null,
     name: []const u8 = "artist_name",
@@ -97,7 +54,7 @@ pub const Album = struct {
     album_type: []const u8,
     total_tracks: u64,
     available_markets: []const []const u8,
-    external_urls: ExternalUrl,
+    external_urls: ExternalUrls,
     href: []const u8,
     id: []const u8,
     images: []const Image,
@@ -115,13 +72,13 @@ pub const Album = struct {
 pub const Playlist = struct {
     collaborative: ?bool = null,
     description: ?[]const u8 = null,
-    external_urls: ExternalUrl = .{},
+    external_urls: ExternalUrls = .{},
     href: ?[]const u8 = null,
     id: ?[]const u8 = null,
     images: []const Image = &[_]Image{},
     name: []const u8 = "playlist_name",
     owner: ?struct {
-        external_urls: ExternalUrl = .{},
+        external_urls: ExternalUrls = .{},
         followers: ?struct {
             href: ?[]const u8 = null, // nullable
             total: ?u64 = null,
@@ -142,7 +99,7 @@ pub const Playlist = struct {
     uri: ?[]const u8 = null,
 };
 
-pub const ExternalUrl = struct {
+pub const ExternalUrls = struct {
     spotify: []const u8 = "https://open.spotify.com",
 };
 
@@ -169,7 +126,7 @@ pub const PlaybackState = struct {
     context: ?struct {
         type: ?[]const u8 = null,
         href: ?[]const u8 = null,
-        external_urls: ExternalUrl = .{},
+        external_urls: ExternalUrls = .{},
         uri: ?[]const u8 = null,
     } = null,
     timestamp: u64 = 0,
@@ -178,8 +135,6 @@ pub const PlaybackState = struct {
     item: ?Track = null,
     currently_playing_type: ?[]const u8 = null,
     // actions...
-
-    const request = "/me/player";
 };
 
 /// https://developer.spotify.com/documentation/web-api/reference/search
@@ -223,56 +178,9 @@ pub const Search = struct {
     // shows...
     // episodes...
     // audiobooks...
-
-    const request = "/search" ++ "?q={s}&type={s}";
 };
 
-/// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
-const Play = struct {
-    const request = "/me/player/play" ++ "?context_url={?s}";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/pause-a-users-playback
-const Pause = struct {
-    const request = "/me/player/pause";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/set-repeat-mode-on-users-playback
-const Repeat = struct {
-    const request = "/me/player/repeat" ++ "?state={s}";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/seek-to-position-in-currently-playing-track
-const Seek = struct {
-    const request = "/me/player/seek" ++ "?position_ms={d}";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/toggle-shuffle-for-users-playback
-const Shuffle = struct {
-    const request = "/me/player/shuffle" ++ "?state={}";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/set-volume-for-users-playback
-const Volume = struct {
-    const request = "/me/player/volume" ++ "?volume_percent={d}";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/save-tracks-user
-const Like = struct {
-    const request = "/me/tracks" ++ "?ids={s}";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/skip-users-playback-to-next-track
-const Next = struct {
-    const request = "/me/player/next";
-};
-
-/// https://developer.spotify.com/documentation/web-api/reference/skip-users-playback-to-previous-track
-const Prev = struct {
-    const request = "/me/player/previous";
-};
-
-const Error = struct {
+pub const Error = struct {
     @"error": struct {
         status: u64,
         message: []const u8,
@@ -280,99 +188,90 @@ const Error = struct {
     },
 };
 
-pub fn get(
-    comptime request: Request,
-    allocator: std.mem.Allocator,
-    client: *std.http.Client,
-    access_token: []const u8,
-) !std.json.Parsed(request.ResponseType()) {
-    comptime std.debug.assert(request.method() == .GET);
-    const T = request.ResponseType();
-
-    const url = api_url ++ T.request;
-    const uri = try std.Uri.parse(url);
-    const authorization = try std.fmt.allocPrint(allocator, "Bearer {s}", .{access_token});
-    defer allocator.free(authorization);
-
-    var header_buf: [4096]u8 = undefined;
-    var req = try client.open(.GET, uri, .{
-        .server_header_buffer = &header_buf,
-        .headers = .{ .authorization = .{ .override = authorization } },
-    });
-    defer req.deinit();
-    try req.send();
-    try req.wait();
-
-    std.log.debug("{s}({s}): Response status: {s} ({d})", .{
-        @tagName(request.method()),
-        @tagName(request),
-        @tagName(req.response.status),
-        @intFromEnum(req.response.status),
-    });
-
-    const response = try req.reader().readAllAlloc(allocator, 8192);
-    defer allocator.free(response);
-
-    switch (req.response.status) {
-        .ok => return std.json.parseFromSlice(T, allocator, response, .{
-            .allocate = .alloc_always,
-            .ignore_unknown_fields = true,
-        }),
-        .no_content => {
-            std.log.warn("Playback not available or active (204)", .{});
-            return error.NotPlaying;
-        },
-        else => {
-            const json = try std.json.parseFromSlice(Error, allocator, response, .{});
-            defer json.deinit();
-            std.log.err("{s} ({d})", .{ json.value.@"error".message, json.value.@"error".status });
-            return error.BadResponse;
-        },
-    }
+pub fn getPlaybackState(client: *Client) !std.json.Parsed(PlaybackState) {
+    return client.sendRequest(PlaybackState, .GET, api_url ++ "/me/player", null);
 }
 
-pub fn put(
-    comptime request: Request,
-    allocator: std.mem.Allocator,
-    client: *std.http.Client,
-    access_token: []const u8,
-    data: anytype,
+// TODO: sanitize query
+// TODO: sanitize types <- ask user a comma serparated list of type or ?
+// TODO: limit, offset
+pub fn search(client: *Client, query: []const u8, types: []const u8) !std.json.Parsed(Search) {
+    const url = std.fmt.allocPrint(client.allocator, api_url ++ "/search?q={s}&type={s}", .{ query, types });
+    defer client.allocator.free(url);
+    return client.sendRequest(Search, .GET, url, null);
+}
+
+// TODO
+/// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
+pub fn startPlayback(
+    client: *Client,
 ) !void {
-    const url = try std.fmt.allocPrint(allocator, api_url ++ request.ResponseType().request, data);
-    defer allocator.free(url);
-    const uri = try std.Uri.parse(url);
-    const authorization = try std.fmt.allocPrint(allocator, "Bearer {s}", .{access_token});
-    defer allocator.free(authorization);
+    const Body = struct {
+        context_uri: ?[]const u8 = null,
+        uris: ?[]const []const u8 = null,
+        offset: ?struct {
+            position: ?u64,
+            uri: ?[]const u8,
+        } = null,
+        position_ms: ?u64 = null,
+    };
 
-    var header_buf: [4096]u8 = undefined;
-    var req = try client.open(request.method(), uri, .{
-        .server_header_buffer = &header_buf,
-        .headers = .{ .authorization = .{ .override = authorization } },
-    });
-    defer req.deinit();
-    req.transfer_encoding = .{ .content_length = 0 };
-    try req.send();
-    try req.finish();
-    try req.wait();
+    const body = try std.json.stringifyAlloc(
+        client.allocator,
+        Body{},
+        .{ .emit_null_optional_fields = false },
+    );
+    defer client.allocator.free(body);
 
-    std.log.debug("{s}({s}): Response status: {s} ({d})", .{
-        @tagName(request.method()),
-        @tagName(request),
-        @tagName(req.response.status),
-        @intFromEnum(req.response.status),
-    });
-
-    switch (req.response.status) {
-        .ok, .no_content, .created, .accepted => return,
-        else => {
-            const response = try req.reader().readAllAlloc(allocator, 4096);
-            defer allocator.free(response);
-            const json = try std.json.parseFromSlice(Error, allocator, response, .{});
-            defer json.deinit();
-            std.log.err("{s} ({d})", .{ json.value.@"error".message, json.value.@"error".status });
-            return error.BadResponse;
-        },
-    }
+    return client.sendRequest(void, .PUT, api_url ++ "/me/player/play", body);
 }
 
-pub const post = put;
+/// https://developer.spotify.com/documentation/web-api/reference/pause-a-users-playback
+pub fn pausePlayback(client: *Client) !void {
+    return client.sendRequest(void, .PUT, api_url ++ "/me/player/pause", "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/skip-users-playback-to-next-track
+pub fn skipToNext(client: *Client) !void {
+    return client.sendRequest(void, .POST, api_url ++ "/me/player/next", "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/skip-users-playback-to-previous-track
+pub fn skipToPrevious(client: *Client) !void {
+    return client.sendRequest(void, .POST, api_url ++ "/me/player/previous", "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/seek-to-position-in-currently-playing-track
+pub fn seekToPosition(client: *Client, position_ms: u64) !void {
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/seek?position_ms={d}", .{position_ms});
+    return client.sendRequest(void, .PUT, url, "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/set-repeat-mode-on-users-playback
+pub fn setRepeatMode(client: *Client, state: []const u8) !void {
+    var buf: [64]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/repeat?state={s}", .{state});
+    return client.sendRequest(void, .PUT, url, "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/set-volume-for-users-playback
+pub fn setVolume(client: *Client, volume: u64) !void {
+    var buf: [64]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/volume?volume_percent={d}", .{volume});
+    return client.sendRequest(void, .PUT, url, "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/toggle-shuffle-for-users-playback
+pub fn toggleShuffle(client: *Client, state: bool) !void {
+    var buf: [64]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/shuffle?state={}", .{state});
+    return client.sendRequest(void, .PUT, url, "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/save-tracks-user
+pub fn saveTrack(client: *Client, id: []const u8) !void {
+    var buf: [64]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/tracks?ids={s}", .{id});
+    return client.sendRequest(void, .PUT, url, "");
+}

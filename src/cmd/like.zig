@@ -8,13 +8,8 @@ pub const usage =
     \\
 ;
 
-pub fn exec(allocator: std.mem.Allocator, client: *std.http.Client, access_token: []const u8) !void {
-    const playback_state = api.get(
-        .playback_state,
-        allocator,
-        client,
-        access_token,
-    ) catch |err| switch (err) {
+pub fn exec(client: *api.Client) !void {
+    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
         error.NotPlaying => return,
         else => return err,
     };
@@ -22,9 +17,9 @@ pub fn exec(allocator: std.mem.Allocator, client: *std.http.Client, access_token
 
     if (playback_state.value.item) |track| {
         std.log.info("Adding '{s}' to your liked songs", .{track.name});
-        try api.put(.like, allocator, client, access_token, .{track.id});
+        try api.saveTrack(client, track.id);
     } else {
-        std.log.err("No track is currently playing", .{});
-        std.process.exit(1);
+        std.log.warn("No track is currently playing", .{});
+        return;
     }
 }

@@ -8,7 +8,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(allocator: std.mem.Allocator, client: *std.http.Client, access_token: []const u8) !void {
+pub fn exec(client: *api.Client) !void {
     std.log.info("Skipping to previous track", .{});
-    try api.post(.prev, allocator, client, access_token, .{});
+    try api.skipToPrevious(client);
 }

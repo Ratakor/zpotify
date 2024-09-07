@@ -9,12 +9,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(
-    allocator: std.mem.Allocator,
-    arg: ?[]const u8,
-    client: *std.http.Client,
-    access_token: []const u8,
-) !void {
+pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     if (arg) |state| {
         if (!std.mem.eql(u8, state, "track") and
             !std.mem.eql(u8, state, "context") and
@@ -25,14 +20,9 @@ pub fn exec(
             std.process.exit(1);
         }
         std.log.info("Setting repeat mode to {s}", .{state});
-        try api.put(.repeat, allocator, client, access_token, .{state});
+        try api.setRepeatMode(client, state);
     } else {
-        const playback_state = api.get(
-            .playback_state,
-            allocator,
-            client,
-            access_token,
-        ) catch |err| switch (err) {
+        const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
             error.NotPlaying => return,
             else => return err,
         };

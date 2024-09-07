@@ -8,19 +8,14 @@ pub const usage =
     \\
 ;
 
-pub fn exec(allocator: std.mem.Allocator, client: *std.http.Client, access_token: []const u8) !void {
-    const playback_state = api.get(
-        .playback_state,
-        allocator,
-        client,
-        access_token,
-    ) catch |err| switch (err) {
+pub fn exec(client: *api.Client) !void {
+    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
         error.NotPlaying => return,
         else => return err,
     };
     defer playback_state.deinit();
 
-    const new_shuffle_state = !playback_state.value.shuffle_state;
-    std.log.info("Setting shuffle to {s}", .{if (new_shuffle_state) "on" else "off"});
-    try api.put(.shuffle, allocator, client, access_token, .{new_shuffle_state});
+    const new_state = !playback_state.value.shuffle_state;
+    std.log.info("Setting shuffle to {s}", .{if (new_state) "on" else "off"});
+    try api.toggleShuffle(client, new_state);
 }

@@ -1,5 +1,5 @@
 const std = @import("std");
-const Config = @import("../Config.zig");
+const Client = @import("../Client.zig");
 
 pub const usage =
     \\Usage: {s} logout
@@ -9,9 +9,9 @@ pub const usage =
 ;
 
 pub fn exec(allocator: std.mem.Allocator) !void {
-    const config_path = try Config.getPath(allocator);
-    defer allocator.free(config_path);
-    std.fs.deleteFileAbsolute(config_path) catch |err| {
+    const save_path = try Client.getSavePath(allocator);
+    defer allocator.free(save_path);
+    std.fs.deleteFileAbsolute(save_path) catch |err| {
         if (err != error.FileNotFound) {
             return err;
         }

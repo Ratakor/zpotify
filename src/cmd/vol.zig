@@ -9,18 +9,8 @@ pub const usage =
     \\
 ;
 
-pub fn exec(
-    allocator: std.mem.Allocator,
-    arg: ?[]const u8,
-    client: *std.http.Client,
-    access_token: []const u8,
-) !void {
-    const playback_state = api.get(
-        .playback_state,
-        allocator,
-        client,
-        access_token,
-    ) catch |err| switch (err) {
+pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
+    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
         error.NotPlaying => return,
         else => return err,
     };
@@ -31,12 +21,12 @@ pub fn exec(
             if (device.supports_volume) {
                 break :blk device.volume_percent.?;
             } else {
-                std.log.err("Volume control is not supported for this device", .{});
-                std.process.exit(1);
+                std.log.warn("Volume control is not supported for this device", .{});
+                return;
             }
         } else {
-            std.log.err("No active device", .{});
-            std.process.exit(1);
+            std.log.warn("No active device", .{});
+            return;
         }
     };
 
@@ -61,7 +51,7 @@ pub fn exec(
             }
         }
         std.log.info("Setting volume to {d}%", .{volume});
-        try api.put(.volume, allocator, client, access_token, .{volume});
+        try api.setVolume(client, volume);
     } else {
         std.log.info("Volume for {s} is set to {d}%", .{
             playback_state.value.device.?.name,

@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Config = @import("Config.zig");
+const Client = @import("Client.zig");
 const cmd = @import("cmd.zig");
 
 pub const std_options: std.Options = .{
@@ -24,8 +24,8 @@ pub const usage =
     \\  next       | Skip to next track
     \\  repeat     | Get/Set repeat mode
     \\  shuffle    | Toggle shuffle mode
-    \\  seek       | Skip to a specific time (seconds) of the current track
-    \\  vol        | Get/Set volume
+    \\  seek       | Get/Set the position of the current track
+    \\  vol        | Get/Set volume or increase/decrease volume by 10%
     \\  like       | Add the current track to your liked songs
     \\  logout     | Remove the stored credentials from the config file
     \\  help       | Display information about a command
@@ -92,11 +92,8 @@ pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
-    var client: std.http.Client = .{ .allocator = allocator };
-    defer client.deinit();
 
-    var args = try std.process.argsWithAllocator(allocator);
-    defer args.deinit();
+    var args = std.process.args();
     progname = args.next().?;
     const command = args.next() orelse "help";
 
@@ -108,27 +105,27 @@ pub fn main() !void {
         return cmd.version.exec();
     }
 
-    const config = try Config.init(allocator, &client);
-    defer config.deinit();
+    var client = try Client.init(allocator);
+    defer client.deinit();
 
     if (std.mem.eql(u8, command, "print")) {
-        return cmd.print.exec(allocator, &args, &client, config.access_token);
+        return cmd.print.exec(&client, &args);
     } else if (std.mem.eql(u8, command, "pause")) {
-        return cmd.pause.exec(allocator, &client, config.access_token);
+        return cmd.pause.exec(&client);
     } else if (std.mem.eql(u8, command, "prev")) {
-        return cmd.prev.exec(allocator, &client, config.access_token);
+        return cmd.prev.exec(&client);
     } else if (std.mem.eql(u8, command, "next")) {
-        return cmd.next.exec(allocator, &client, config.access_token);
+        return cmd.next.exec(&client);
     } else if (std.mem.eql(u8, command, "repeat")) {
-        return cmd.repeat.exec(allocator, args.next(), &client, config.access_token);
+        return cmd.repeat.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "shuffle")) {
-        return cmd.shuffle.exec(allocator, &client, config.access_token);
+        return cmd.shuffle.exec(&client);
     } else if (std.mem.eql(u8, command, "seek")) {
-        return cmd.seek.exec(allocator, args.next(), &client, config.access_token);
+        return cmd.seek.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "vol")) {
-        return cmd.vol.exec(allocator, args.next(), &client, config.access_token);
+        return cmd.vol.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "like")) {
-        return cmd.like.exec(allocator, &client, config.access_token);
+        return cmd.like.exec(&client);
     } else {
         std.log.err("Unknown command: '{s}'", .{command});
         cmd.help.exec(null);

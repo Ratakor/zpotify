@@ -8,13 +8,8 @@ pub const usage =
     \\
 ;
 
-pub fn exec(allocator: std.mem.Allocator, client: *std.http.Client, access_token: []const u8) !void {
-    const playback_state = api.get(
-        .playback_state,
-        allocator,
-        client,
-        access_token,
-    ) catch |err| switch (err) {
+pub fn exec(client: *api.Client) !void {
+    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
         error.NotPlaying => return,
         else => return err,
     };
@@ -22,9 +17,9 @@ pub fn exec(allocator: std.mem.Allocator, client: *std.http.Client, access_token
 
     if (playback_state.value.is_playing) {
         std.log.info("Pausing playback", .{});
-        try api.put(.pause, allocator, client, access_token, .{});
+        try api.pausePlayback(client);
     } else {
         std.log.info("Resuming playback", .{});
-        try api.put(.play, allocator, client, access_token, .{@as(?[]const u8, null)});
+        try api.startPlayback(client);
     }
 }

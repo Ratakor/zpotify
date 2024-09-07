@@ -9,12 +9,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(
-    allocator: std.mem.Allocator,
-    arg: ?[]const u8,
-    client: *std.http.Client,
-    access_token: []const u8,
-) !void {
+pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     if (arg) |raw_arg| {
         var min, var sec = blk: {
             const sep = std.mem.indexOfScalar(u8, raw_arg, ':') orelse {
@@ -29,14 +24,9 @@ pub fn exec(
         const ms = (min * std.time.ms_per_min) + (sec * std.time.ms_per_s);
 
         std.log.info("Seeking to {d}:{d:0>2}", .{ min, sec });
-        try api.put(.seek, allocator, client, access_token, .{ms});
+        try api.seekToPosition(client, ms);
     } else {
-        const playback_state = api.get(
-            .playback_state,
-            allocator,
-            client,
-            access_token,
-        ) catch |err| switch (err) {
+        const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
             error.NotPlaying => return,
             else => return err,
         };
@@ -56,8 +46,8 @@ pub fn exec(
                 .{ progress_min, progress_s, duration_min, duration_s },
             );
         } else {
-            std.log.err("No track is currently playing", .{});
-            std.process.exit(1);
+            std.log.warn("No track is currently playing", .{});
+            return;
         }
     }
 }
