@@ -13,6 +13,16 @@ pub const usage =
     \\    "tooltip": "Track: {{title}}\nArtist(s): {{artists}}\nAlbum: {{album}}\nDevice: {{device}}\nProgress: {{bar:40}} {{progress}} / {{duration}}\nShuffle: {{shuffle}}\t\tVolume: {{volume}}%\t\tRepeat: {{repeat}}"
     \\}}
     \\
+    \\Configuration:
+    \\"custom/zpotify": {{
+    \\    "exec": "zpotify waybar",
+    \\    "return-type": "json",
+    \\    "tooltip": true,
+    \\    "on-click": "zpotify prev",
+    \\    "on-click-middle": "zpotify pause",
+    \\    "on-click-right": "zpotify next"
+    \\}}
+    \\
 ;
 
 const bar_len = 40;
@@ -24,6 +34,7 @@ pub fn exec(client: *api.Client, allocator: std.mem.Allocator) !void {
 
     while (true) {
         defer std.time.sleep(std.time.ns_per_s);
+        defer stdout.writeAll("\n") catch {};
 
         const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
             error.NotPlaying => continue,
