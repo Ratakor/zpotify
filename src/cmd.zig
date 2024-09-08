@@ -15,6 +15,7 @@ pub const shuffle = @import("cmd/shuffle.zig");
 pub const seek = @import("cmd/seek.zig");
 pub const vol = @import("cmd/vol.zig");
 pub const like = @import("cmd/like.zig");
+pub const waybar = @import("cmd/waybar.zig");
 pub const logout = @import("cmd/logout.zig");
 pub const help = @import("cmd/help.zig");
 pub const version = @import("cmd/version.zig");

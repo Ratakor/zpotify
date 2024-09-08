@@ -11,7 +11,7 @@ http_client: std.http.Client,
 allocator: std.mem.Allocator,
 
 const redirect_uri = "http://localhost:9999/callback";
-const save_filename = "save.json";
+const save_filename = "config.json";
 
 const Save = struct {
     basic_auth: []const u8,
@@ -30,38 +30,14 @@ pub fn init(allocator: std.mem.Allocator) !Client {
         defer json_reader.deinit();
         if (std.json.parseFromTokenSource(Save, allocator, &json_reader, .{})) |save_json| {
             defer save_json.deinit();
-            // if (isExpired)
-            if (save_json.value.expiration <= std.time.timestamp()) {
-                var client: Client = .{
-                    .basic_auth = try allocator.dupe(u8, save_json.value.basic_auth),
-                    .refresh_token = try allocator.dupe(u8, save_json.value.refresh_token),
-                    .access_token = undefined,
-                    .expiration = undefined,
-                    .http_client = .{ .allocator = allocator },
-                    .allocator = allocator,
-                };
-                var buffer: [256]u8 = undefined;
-                const body = try std.fmt.bufPrint(
-                    &buffer,
-                    "grant_type=refresh_token&refresh_token={s}",
-                    .{client.refresh_token},
-                );
-                if (try client.getToken(body)) |new_refresh_token| {
-                    allocator.free(client.refresh_token);
-                    client.refresh_token = new_refresh_token;
-                }
-                try client.updateSaveFile(save_file);
-                return client;
-            } else {
-                return .{
-                    .basic_auth = try allocator.dupe(u8, save_json.value.basic_auth),
-                    .refresh_token = try allocator.dupe(u8, save_json.value.refresh_token),
-                    .access_token = try allocator.dupe(u8, save_json.value.access_token),
-                    .expiration = save_json.value.expiration,
-                    .http_client = .{ .allocator = allocator },
-                    .allocator = allocator,
-                };
-            }
+            return .{
+                .basic_auth = try allocator.dupe(u8, save_json.value.basic_auth),
+                .refresh_token = try allocator.dupe(u8, save_json.value.refresh_token),
+                .access_token = try allocator.dupe(u8, save_json.value.access_token),
+                .expiration = save_json.value.expiration,
+                .http_client = .{ .allocator = allocator },
+                .allocator = allocator,
+            };
         } else |err| {
             std.log.warn("Failed to parse the save file: {}", .{err});
             break :blk try cwd.createFile(save_path, .{});
@@ -79,9 +55,9 @@ pub fn init(allocator: std.mem.Allocator) !Client {
     const stdout = std.io.getStdOut().writer();
     try stdout.writeAll("Welcome to zpotify!\n");
     try stdout.writeAll("This is probably your first time running zpotify, so we need to authenticate with Spotify.\n");
-    try stdout.writeAll("Go to https://developer.spotify.com/dashboard\n");
-    try stdout.writeAll("Create a new app, name and description doesn't matter but redirect URI must be" ++ redirect_uri ++ "\n");
-    try stdout.writeAll("Enter the following informations\n");
+    try stdout.writeAll("Go to https://developer.spotify.com/dashboard.\n");
+    try stdout.writeAll("Create a new app, name and description doesn't matter but redirect URI must be '" ++ redirect_uri ++ "'.\n");
+    try stdout.writeAll("Enter the following informations:\n");
     const client_id = try getClientData("ID", allocator);
     defer allocator.free(client_id);
     const client_secret = try getClientData("Secret", allocator);
@@ -150,10 +126,8 @@ pub fn sendRequest(
     body: ?[]const u8,
 ) !if (T == void) void else std.json.Parsed(T) {
     const uri = try std.Uri.parse(url);
-    var auth_buf: [512]u8 = undefined;
-    const auth_header = try std.fmt.bufPrint(&auth_buf, "Bearer {s}", .{self.access_token});
-    // const auth_header = try self.getAuthHeader();
-    // defer self.allocator.free(auth_header);
+    const auth_header = try self.getAuthHeader();
+    defer self.allocator.free(auth_header);
     var header_buf: [4096]u8 = undefined;
     var req = try self.http_client.open(method, uri, .{
         .server_header_buffer = &header_buf,
@@ -293,8 +267,8 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     const url = try std.fmt.bufPrint(
         &buffer,
         "https://accounts.spotify.com/authorize?client_id={s}&" ++ //state={s}&" ++
-            "response_type=code&redirect_uri={query}&scope=" ++ scope,
-        .{ client_id, std.Uri.Component{ .raw = redirect_uri } },
+            "response_type=code&redirect_uri=" ++ redirect_uri ++ "&scope=" ++ scope,
+        .{client_id},
     );
 
     const localhost = try std.net.Address.parseIp4("127.0.0.1", 9999);
@@ -378,7 +352,6 @@ fn getToken(self: *Client, body: []const u8) !?[]const u8 {
     }
 }
 
-// TODO: for daemon -> remove update in init
 fn getAuthHeader(self: *Client) ![]const u8 {
     if (self.expiration <= std.time.timestamp()) {
         var buffer: [256]u8 = undefined;

@@ -32,7 +32,7 @@ pub const usage =
 
 const default_format =
     \\Track: {title}
-    \\Artists: {artists}
+    \\Artist(s): {artists}
     \\Album: {album}
     \\Device: {device}
     \\Volume: {volume}%
@@ -52,7 +52,6 @@ fn escapeDefaultFormat() []const u8 {
         var fba = std.heap.FixedBufferAllocator.init(buffer[0..]);
         const allocator = fba.allocator();
         const tmp = std.mem.replaceOwned(u8, allocator, default_format, "{", "{{") catch unreachable;
-        defer allocator.free(tmp);
         return std.mem.replaceOwned(u8, allocator, tmp, "}", "}}") catch unreachable;
     }
 }
@@ -279,7 +278,7 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
     }
 }
 
-fn writeTime(writer: anytype, ms: u64) !void {
+pub fn writeTime(writer: anytype, ms: u64) !void {
     const min = ms / std.time.ms_per_min;
     const s = (ms / std.time.ms_per_s) % std.time.s_per_min;
     try writer.print("{d}:{d:0>2}", .{ min, s });

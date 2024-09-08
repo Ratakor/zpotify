@@ -7,7 +7,7 @@ _zpotify() {
 
     case $state in
     cmd)
-        main_commands=('print\:"Display current track info in a specific format" play\:"Play a track, playlist, album, or artist" pause\:"Toggle pause state" prev\:"Skip to previous track" next\:"Skip to next track" repeat\:"Get/Set repeat mode" shuffle\:"Toggle shuffle mode" seek\:"Skip to a specific time (seconds) of the current track" vol\:"Get/Set volume" like\:"Add the current track to your liked songs" logout\:"Remove the stored credentials from the config file" help\:"Display information about a command" version\:"Display program version"')
+        main_commands=('print\:"Display current track info in a specific format" play\:"Play a track, playlist, album, or artist" pause\:"Toggle pause state" prev\:"Skip to previous track" next\:"Skip to next track" repeat\:"Get/Set repeat mode" shuffle\:"Toggle shuffle mode" seek\:"Skip to a specific time (seconds) of the current track" vol\:"Get/Set volume" like\:"Add the current track to your liked songs" waybar\:"Display infos about the current playback for a waybar module" logout\:"Remove the stored credentials from the config file" help\:"Display information about a command" version\:"Display program version"')
         main_commands=($main_commands)
         _alternative "args:command:(($main_commands))"
         ;;
@@ -22,7 +22,7 @@ _zpotify() {
             _arguments -s "2:query_type:(track playlist album artist)"
             ;;
         repeat)
-            _arguments -s "2:repeat_mode:(track playlist off)"
+            _arguments -s "2:repeat_mode:(track context off)"
             ;;
         seek)
             _arguments -s "2:seconds:(0:00 $(zpotify print {duration} 2>/dev/null))"
@@ -31,7 +31,7 @@ _zpotify() {
             _arguments -s "2:volume:(up down $(zpotify print {volume} 2>/dev/null))"
             ;;
         help)
-            _arguments -s "2:commands:(print play pause prev next repeat shuffle seek vol like logout help version)"
+            _arguments -s "2:commands:(print play pause prev next repeat shuffle seek vol like waybar logout help version)"
             ;;
         esac
         ;;

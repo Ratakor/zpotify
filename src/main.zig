@@ -12,7 +12,7 @@ pub const version = "0.1.0";
 pub var progname: []const u8 = undefined;
 
 pub const usage =
-    \\Usage: {s} [command] [option]
+    \\Usage: {s} [command] [options]
     \\
     \\Commands:
     \\  print      | Display current track info in a specific format
@@ -25,6 +25,7 @@ pub const usage =
     \\  seek       | Get/Set the position of the current track
     \\  vol        | Get/Set volume or increase/decrease volume by 10%
     \\  like       | Add the current track to your liked songs
+    \\  waybar     | Display infos about the current playback for a waybar module
     \\  logout     | Remove the stored credentials from the config file
     \\  help       | Display information about a command
     \\  version    | Display program version
@@ -126,6 +127,8 @@ pub fn main() !void {
         return cmd.vol.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "like")) {
         return cmd.like.exec(&client);
+    } else if (std.mem.eql(u8, command, "waybar")) {
+        return cmd.waybar.exec(&client, allocator);
     } else {
         std.log.err("Unknown command: '{s}'", .{command});
         cmd.help.exec(null);

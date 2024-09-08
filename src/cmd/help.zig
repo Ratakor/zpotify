@@ -32,6 +32,8 @@ pub fn exec(command: ?[]const u8) void {
             stderr.print(cmd.vol.usage, .{main.progname}) catch unreachable;
         } else if (std.mem.eql(u8, com, "like")) {
             stderr.print(cmd.like.usage, .{main.progname}) catch unreachable;
+        } else if (std.mem.eql(u8, com, "waybar")) {
+            stderr.print(cmd.waybar.usage, .{main.progname}) catch unreachable;
         } else if (std.mem.eql(u8, com, "logout")) {
             stderr.print(cmd.logout.usage, .{main.progname}) catch unreachable;
         } else if (std.mem.eql(u8, com, "help")) {
