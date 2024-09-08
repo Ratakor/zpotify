@@ -196,12 +196,26 @@ pub fn sendRequest(
                 return error.NotPlaying;
             }
         },
+        .not_found => {
+            std.log.warn("No active device found ({d})", .{@intFromEnum(req.response.status)});
+            return error.NotFound;
+        },
         else => {
+            const Error = struct {
+                @"error": struct {
+                    status: u64,
+                    message: []const u8,
+                    reason: ?[]const u8 = null,
+                },
+            };
             var json_reader = std.json.reader(self.allocator, req.reader());
             defer json_reader.deinit();
-            const json = try std.json.parseFromTokenSource(api.Error, self.allocator, &json_reader, .{});
-            defer json.deinit();
-            std.log.err("{s} ({d})", .{ json.value.@"error".message, json.value.@"error".status });
+            if (std.json.parseFromTokenSource(Error, self.allocator, &json_reader, .{})) |json| {
+                std.log.err("{s} ({d})", .{ json.value.@"error".message, json.value.@"error".status });
+                json.deinit();
+            } else |err| {
+                std.log.err("Failed to parse the error response: {}", .{err});
+            }
             return error.BadResponse;
         },
     }
@@ -263,14 +277,6 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
         break :blk buf[0..size];
     };
 
-    // useless
-    const escaped_redirect_uri = comptime blk: {
-        var buffer: [4096]u8 = undefined;
-        const size = std.mem.replacementSize(u8, redirect_uri, "/", "%2F");
-        _ = std.mem.replace(u8, redirect_uri, "/", "%2F", &buffer);
-        break :blk buffer[0..size];
-    };
-
     // TODO: returns INVALID_CLIENT: Invalid client
     // const state = blk: {
     //     var source: [16]u8 = undefined;
@@ -287,8 +293,8 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     const url = try std.fmt.bufPrint(
         &buffer,
         "https://accounts.spotify.com/authorize?client_id={s}&" ++ //state={s}&" ++
-            "response_type=code&redirect_uri=" ++ escaped_redirect_uri ++ "&scope=" ++ scope,
-        .{client_id},
+            "response_type=code&redirect_uri={query}&scope=" ++ scope,
+        .{ client_id, std.Uri.Component{ .raw = redirect_uri } },
     );
 
     const localhost = try std.net.Address.parseIp4("127.0.0.1", 9999);
@@ -340,13 +346,16 @@ fn getToken(self: *Client, body: []const u8) !?[]const u8 {
     defer json_reader.deinit();
 
     if (req.response.status != .ok) {
-        const Response = struct {
-            @"error": ?[]const u8 = null,
+        const AuthError = struct {
+            @"error": []const u8,
             error_description: ?[]const u8 = null,
         };
-        const json = try std.json.parseFromTokenSource(Response, self.allocator, &json_reader, .{});
-        defer json.deinit();
-        std.log.err("{?s} ({?s})", .{ json.value.error_description, json.value.@"error" });
+        if (std.json.parseFromTokenSource(AuthError, self.allocator, &json_reader, .{})) |json| {
+            std.log.err("{?s} ({s})", .{ json.value.error_description, json.value.@"error" });
+            json.deinit();
+        } else |err| {
+            std.log.err("Failed to parse the error response: {}", .{err});
+        }
         return error.BadResponse;
     } else {
         const Response = struct {

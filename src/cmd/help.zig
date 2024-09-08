@@ -14,6 +14,8 @@ pub fn exec(command: ?[]const u8) void {
     if (command) |com| {
         if (std.mem.eql(u8, com, "print")) {
             stderr.print(cmd.print.usage, .{main.progname}) catch unreachable;
+        } else if (std.mem.eql(u8, com, "play")) {
+            stderr.print(cmd.play.usage, .{main.progname}) catch unreachable;
         } else if (std.mem.eql(u8, com, "pause")) {
             stderr.print(cmd.pause.usage, .{main.progname}) catch unreachable;
         } else if (std.mem.eql(u8, com, "prev")) {

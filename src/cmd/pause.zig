@@ -20,6 +20,9 @@ pub fn exec(client: *api.Client) !void {
         try api.pausePlayback(client);
     } else {
         std.log.info("Resuming playback", .{});
-        try api.startPlayback(client);
+        api.startPlayback(client, null, null) catch |err| switch (err) {
+            error.NotFound => return,
+            else => return err,
+        };
     }
 }

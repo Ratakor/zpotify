@@ -1,10 +1,12 @@
 // when adding a new command make sure to add it to
 // - src/cmd/help.zig
-// - src/main.zig (usage and main())
+// - src/main.zig (usage + main())
 // - src/cmd.zig
-// - _zpotify
+// - _zpotify (main_commands + help)
+// - README.md
 
 pub const print = @import("cmd/print.zig");
+pub const play = @import("cmd/play.zig");
 pub const pause = @import("cmd/pause.zig");
 pub const prev = @import("cmd/prev.zig");
 pub const next = @import("cmd/next.zig");

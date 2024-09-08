@@ -37,7 +37,7 @@ pub const Track = struct {
     preview_url: ?[]const u8 = null, // nullable
     track_number: ?u64 = null,
     type: []const u8 = "track",
-    uri: ?[]const u8 = null,
+    uri: []const u8,
     is_local: bool = false,
 };
 
@@ -47,7 +47,7 @@ pub const Artist = struct {
     id: ?[]const u8 = null,
     name: []const u8 = "artist_name",
     type: []const u8 = "artist",
-    uri: ?[]const u8 = null,
+    uri: []const u8,
 };
 
 pub const Album = struct {
@@ -96,7 +96,7 @@ pub const Playlist = struct {
         total: ?u64 = null,
     } = null,
     type: []const u8 = "playlist",
-    uri: ?[]const u8 = null,
+    uri: []const u8,
 };
 
 pub const ExternalUrls = struct {
@@ -109,7 +109,6 @@ pub const Image = struct {
     width: ?u64,
 };
 
-/// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
 pub const PlaybackState = struct {
     device: ?struct {
         id: ?[]const u8 = null, // nullable
@@ -137,9 +136,8 @@ pub const PlaybackState = struct {
     // actions...
 };
 
-/// https://developer.spotify.com/documentation/web-api/reference/search
 pub const Search = struct {
-    tracks: struct {
+    tracks: ?struct {
         href: []const u8,
         limit: u64,
         next: ?[]const u8,
@@ -147,8 +145,8 @@ pub const Search = struct {
         previous: ?[]const u8,
         total: u64,
         items: []const Track,
-    },
-    artists: struct {
+    } = null,
+    artists: ?struct {
         href: []const u8,
         limit: u64,
         next: ?[]const u8,
@@ -156,8 +154,8 @@ pub const Search = struct {
         previous: ?[]const u8,
         total: u64,
         items: []const Artist,
-    },
-    albums: struct {
+    } = null,
+    albums: ?struct {
         href: []const u8,
         limit: u64,
         next: ?[]const u8,
@@ -165,8 +163,8 @@ pub const Search = struct {
         previous: ?[]const u8,
         total: u64,
         items: []const Album,
-    },
-    playlists: struct {
+    } = null,
+    playlists: ?struct {
         href: []const u8,
         limit: u64,
         next: ?[]const u8,
@@ -174,42 +172,40 @@ pub const Search = struct {
         previous: ?[]const u8,
         total: u64,
         items: []const Playlist,
-    },
-    // shows...
-    // episodes...
-    // audiobooks...
+    } = null,
 };
 
-pub const Error = struct {
-    @"error": struct {
-        status: u64,
-        message: []const u8,
-        reason: ?[]const u8 = null,
-    },
-};
-
+/// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
 pub fn getPlaybackState(client: *Client) !std.json.Parsed(PlaybackState) {
     return client.sendRequest(PlaybackState, .GET, api_url ++ "/me/player", null);
 }
 
-// TODO: sanitize query
-// TODO: sanitize types <- ask user a comma serparated list of type or ?
-// TODO: limit, offset
-pub fn search(client: *Client, query: []const u8, types: []const u8) !std.json.Parsed(Search) {
-    const url = std.fmt.allocPrint(client.allocator, api_url ++ "/search?q={s}&type={s}", .{ query, types });
+/// https://developer.spotify.com/documentation/web-api/reference/search
+pub fn search(
+    client: *Client,
+    query: []const u8, // will be sanitized
+    types: []const u8, // comma separated list of types
+    limit: u64, // max num of results, 0-50 (default 20)
+    offset: u64, // index of first result to return (default 0)
+) !std.json.Parsed(Search) {
+    const url = try std.fmt.allocPrint(
+        client.allocator,
+        api_url ++ "/search?q={query}&type={s}&limit={d}&offset={d}",
+        .{ std.Uri.Component{ .raw = query }, types, limit, offset },
+    );
     defer client.allocator.free(url);
     return client.sendRequest(Search, .GET, url, null);
 }
-
-// TODO
 /// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
 pub fn startPlayback(
     client: *Client,
+    context_uri: ?[]const u8, // for album, artist or playlist
+    uris: ?[]const []const u8, // for tracks
 ) !void {
     const Body = struct {
-        context_uri: ?[]const u8 = null,
-        uris: ?[]const []const u8 = null,
-        offset: ?struct {
+        context_uri: ?[]const u8,
+        uris: ?[]const []const u8,
+        offset: ?struct { // union
             position: ?u64,
             uri: ?[]const u8,
         } = null,
@@ -218,7 +214,7 @@ pub fn startPlayback(
 
     const body = try std.json.stringifyAlloc(
         client.allocator,
-        Body{},
+        Body{ .context_uri = context_uri, .uris = uris },
         .{ .emit_null_optional_fields = false },
     );
     defer client.allocator.free(body);
@@ -270,8 +266,15 @@ pub fn toggleShuffle(client: *Client, state: bool) !void {
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/save-tracks-user
-pub fn saveTrack(client: *Client, id: []const u8) !void {
-    var buf: [64]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/tracks?ids={s}", .{id});
+pub fn saveTracks(client: *Client, ids: []const u8) !void {
+    const url = try std.fmt.allocPrint(client.allocator, api_url ++ "/me/tracks?ids={s}", .{ids});
+    defer client.allocator.free(url);
     return client.sendRequest(void, .PUT, url, "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user
+pub fn removeTracks(client: *Client, ids: []const u8) !void {
+    const url = try std.fmt.allocPrint(client.allocator, api_url ++ "/me/tracks?ids={s}", .{ids});
+    defer client.allocator.free(url);
+    return client.sendRequest(void, .DELETE, url, null);
 }

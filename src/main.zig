@@ -16,9 +16,7 @@ pub const usage =
     \\
     \\Commands:
     \\  print      | Display current track info in a specific format
-    // TODO
-    // \\  play       | Play top result for specified artist, album, playlist, track, or uri
-    // \\  playlists  | Display a list of your playlists (e.g. for use with play and dmenu)
+    \\  play       | Play a track, playlist, album, or artist
     \\  pause      | Toggle pause state
     \\  prev       | Skip to previous track
     \\  next       | Skip to next track
@@ -110,6 +108,8 @@ pub fn main() !void {
 
     if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
+    } else if (std.mem.eql(u8, command, "play")) {
+        return cmd.play.exec(&client, &args);
     } else if (std.mem.eql(u8, command, "pause")) {
         return cmd.pause.exec(&client);
     } else if (std.mem.eql(u8, command, "prev")) {
