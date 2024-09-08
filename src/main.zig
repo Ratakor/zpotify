@@ -8,7 +8,7 @@ pub const std_options: std.Options = .{
     .logFn = coloredLog,
 };
 
-pub const version = "0.0.0";
+pub const version = "0.1.0";
 pub var progname: []const u8 = undefined;
 
 pub const usage =
