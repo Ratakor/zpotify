@@ -11,7 +11,7 @@ pub const usage =
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-        error.NotPlaying => return,
+        error.NotPlaying => std.process.exit(1),
         else => return err,
     };
     defer playback_state.deinit();
@@ -21,12 +21,12 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             if (device.supports_volume) {
                 break :blk device.volume_percent.?;
             } else {
-                std.log.warn("Volume control is not supported for this device", .{});
-                return;
+                std.log.err("Volume control is not supported for this device", .{});
+                std.process.exit(1);
             }
         } else {
             std.log.warn("No active device", .{});
-            return;
+            std.process.exit(1);
         }
     };
 

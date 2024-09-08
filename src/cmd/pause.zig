@@ -10,7 +10,7 @@ pub const usage =
 
 pub fn exec(client: *api.Client) !void {
     const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-        error.NotPlaying => return,
+        error.NotPlaying => std.process.exit(1),
         else => return err,
     };
     defer playback_state.deinit();
@@ -21,7 +21,7 @@ pub fn exec(client: *api.Client) !void {
     } else {
         std.log.info("Resuming playback", .{});
         api.startPlayback(client, null, null) catch |err| switch (err) {
-            error.NotFound => return,
+            error.NotFound => std.process.exit(1),
             else => return err,
         };
     }

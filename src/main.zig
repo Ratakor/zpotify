@@ -78,13 +78,8 @@ fn coloredLog(
         .info => std.io.getStdOut().writer(),
     });
     const writer = bw.writer();
-
-    std.debug.lockStdErr();
-    defer std.debug.unlockStdErr();
-    nosuspend {
-        writer.print(level_txt ++ scope_prefix ++ format ++ "\n", args) catch return;
-        bw.flush() catch return;
-    }
+    writer.print(level_txt ++ scope_prefix ++ format ++ "\n", args) catch return;
+    bw.flush() catch return;
 }
 
 pub fn main() !void {
@@ -94,7 +89,10 @@ pub fn main() !void {
 
     var args = std.process.args();
     progname = args.next().?;
-    const command = args.next() orelse "help";
+    const command = args.next() orelse {
+        cmd.help.exec(null);
+        std.process.exit(1);
+    };
 
     if (std.mem.eql(u8, command, "logout")) {
         return cmd.logout.exec(allocator);

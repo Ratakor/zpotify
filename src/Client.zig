@@ -214,26 +214,27 @@ fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
         try stdout.print("Client {s}: ", .{name});
         const data = stdin.readUntilDelimiterAlloc(allocator, '\n', 64) catch |err| switch (err) {
             error.StreamTooLong => {
-                std.log.warn("The client {s} must be 32 bytes long.", .{name});
+                std.log.warn("The client {s} must be 32 bytes long", .{name});
                 continue;
             },
             else => return err,
         };
         if (data.len != 32) {
-            std.log.warn("The client {s} must be 32 bytes long.", .{name});
+            std.log.warn("The client {s} must be 32 bytes long", .{name});
             allocator.free(data);
             continue;
         }
         for (data) |byte| {
             if (!std.ascii.isHex(byte)) {
-                std.log.warn("The client {s} must be a hex string.", .{name});
+                std.log.warn("The client {s} must be a hex string", .{name});
                 allocator.free(data);
                 continue :outer;
             }
         }
         return data;
     }
-    return error.TooManyRetries;
+    std.log.err("Too many retries", .{});
+    std.process.exit(1);
 }
 
 fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
@@ -360,6 +361,7 @@ fn getAuthHeader(self: *Client) ![]const u8 {
             "grant_type=refresh_token&refresh_token={s}",
             .{self.refresh_token},
         );
+        self.allocator.free(self.access_token);
         if (try self.getToken(body)) |new_refresh_token| {
             self.allocator.free(self.refresh_token);
             self.refresh_token = new_refresh_token;

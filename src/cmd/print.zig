@@ -58,7 +58,7 @@ fn escapeDefaultFormat() []const u8 {
 
 pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
     const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-        error.NotPlaying => return,
+        error.NotPlaying => std.process.exit(1),
         else => return err,
     };
     defer playback_state.deinit();
@@ -123,20 +123,13 @@ fn format(writer: anytype, fmt: []const u8, info: api.PlaybackState) !void {
                             std.log.err("Missing hex digit", .{});
                             std.process.exit(1);
                         }
-                        const p1 = hexToInt(fmt[i]) catch {
-                            std.log.warn("Invalid hex digit: {c}", .{fmt[i]});
-                            i += 1;
-                            continue;
-                        };
+                        const p1 = hexToInt(fmt[i]);
                         i += 1;
                         if (i >= fmt.len) {
                             std.log.err("Missing hex digit", .{});
                             std.process.exit(1);
                         }
-                        const p2 = hexToInt(fmt[i]) catch {
-                            std.log.warn("Invalid hex digit: {c}", .{fmt[i]});
-                            continue;
-                        };
+                        const p2 = hexToInt(fmt[i]);
                         break :blk p1 * 16 + p2;
                     },
                     else => {
@@ -151,12 +144,15 @@ fn format(writer: anytype, fmt: []const u8, info: api.PlaybackState) !void {
     }
 }
 
-fn hexToInt(c: u8) !u8 {
+fn hexToInt(c: u8) u8 {
     return switch (c) {
         '0'...'9' => c - '0',
         'a'...'f' => c - 'a' + 10,
         'A'...'F' => c - 'A' + 10,
-        else => error.InvalidChar,
+        else => {
+            std.log.err("Invalid hex digit: {c}", .{c});
+            std.process.exit(1);
+        },
     };
 }
 

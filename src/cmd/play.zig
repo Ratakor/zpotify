@@ -30,7 +30,7 @@ pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
     } else {
         std.log.info("Resuming playback", .{});
         api.startPlayback(client, null, null) catch |err| switch (err) {
-            error.NotFound => return,
+            error.NotFound => std.process.exit(1),
             else => return err,
         };
         return;
@@ -42,7 +42,7 @@ pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
     };
 
     const search_result = api.search(client, query, @tagName(query_type), 1, 0) catch |err| switch (err) {
-        error.NotPlaying => return,
+        error.NotPlaying => std.process.exit(1),
         else => return err,
     };
     defer search_result.deinit();
@@ -53,18 +53,18 @@ pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
         .album => getInfos(search_result.value.albums),
         .artist => getInfos(search_result.value.artists),
     } orelse {
-        std.log.warn("No {s} found for query: '{s}'", .{ @tagName(query_type), query });
-        return;
+        std.log.err("No {s} found for query: '{s}'", .{ @tagName(query_type), query });
+        std.process.exit(1);
     };
 
     if (query_type == .track) {
         api.startPlayback(client, null, &[_][]const u8{uri}) catch |err| switch (err) {
-            error.NotFound => return,
+            error.NotFound => std.process.exit(1),
             else => return err,
         };
     } else {
         api.startPlayback(client, uri, null) catch |err| switch (err) {
-            error.NotFound => return,
+            error.NotFound => std.process.exit(1),
             else => return err,
         };
     }

@@ -48,35 +48,36 @@ Commands:
 
 ## Performance
 
+2x times faster than the only good alternative [baton](https://github.com/joshuathompson/baton)!
 ```
-% cat run_all
+% cat run
 #!/bin/sh
-$1 play playlist music
+$1 play artist GPF
 $1 next
 $1 prev
 $1 pause
 $1 repeat
 $1 shuffle
-$1 vol up
-% poop "./run_all zpotify" "./run_all baton" --duration 60000
-Benchmark 1 (22 runs): ./run_all zpotify
+$1 vol down
+% poop "./run baton" "./run zpotify" --duration 60000
+Benchmark 1 (15 runs): ./run baton
   measurement          mean ± σ            min … max           outliers         delta
-  wall_time          2.77s  ±  134ms    2.59s  … 3.08s           0 ( 0%)        0%
-  peak_rss           2.34MB ± 25.7KB    2.33MB … 2.42MB          4 (18%)        0%
-  cpu_cycles         2.12G  ±  100M     1.95G  … 2.33G           0 ( 0%)        0%
-  instructions       6.63G  ±  525K     6.62G  … 6.63G           4 (18%)        0%
-  cache_references    989K  ± 54.6K      904K  … 1.11M           0 ( 0%)        0%
-  cache_misses        404K  ± 18.2K      345K  …  441K           1 ( 5%)        0%
-  branch_misses      7.89M  ± 1.72M     5.36M  … 12.4M           0 ( 0%)        0%
-Benchmark 2 (11 runs): ./run_all baton
+  wall_time          4.18s  ± 88.4ms    3.99s  … 4.32s           0 ( 0%)        0%
+  peak_rss           100.0MB ± 96.6KB   99.7MB …  100MB          1 ( 7%)        0%
+  cpu_cycles         14.5G  ±  285M     14.1G  … 15.2G           1 ( 7%)        0%
+  instructions       27.1G  ±  303M     26.5G  … 27.8G           0 ( 0%)        0%
+  cache_references    330M  ± 11.9M      310M  …  353M           0 ( 0%)        0%
+  cache_misses       75.2M  ± 4.46M     67.9M  … 84.4M           0 ( 0%)        0%
+  branch_misses      40.8M  ±  512K     40.0M  … 41.7M           0 ( 0%)        0%
+Benchmark 2 (43 runs): ./run zpotify
   measurement          mean ± σ            min … max           outliers         delta
-  wall_time          5.96s  ±  413ms    4.87s  … 6.43s           1 ( 9%)        💩+114.8% ±  7.0%
-  peak_rss           100.0MB ± 58.4KB   99.9MB …  100MB          0 ( 0%)        💩+4164.7% ±  1.3%
-  cpu_cycles         15.4G  ±  525M     14.6G  … 16.3G           0 ( 0%)        💩+628.0% ± 11.0%
-  instructions       27.2G  ±  308M     26.7G  … 27.6G           0 ( 0%)        💩+310.5% ±  2.0%
-  cache_references    346M  ± 14.1M      325M  …  369M           0 ( 0%)        💩+34890.7% ± 612.1%
-  cache_misses       90.3M  ± 6.71M     82.4M  …  103M           0 ( 0%)        💩+22250.8% ± 710.6%
-  branch_misses      42.0M  ±  857K     40.9M  … 43.2M           0 ( 0%)        💩+432.7% ± 14.3%
+  wall_time          1.40s  ± 87.3ms    1.21s  … 1.64s           0 ( 0%)        ⚡- 66.5% ±  1.3%
+  peak_rss           2.24MB ± 10.3KB    2.24MB … 2.28MB          9 (21%)        ⚡- 97.8% ±  0.0%
+  cpu_cycles         2.11G  ± 98.1M     2.03G  … 2.38G           4 ( 9%)        ⚡- 85.5% ±  0.7%
+  instructions       6.70G  ± 6.02K     6.70G  … 6.70G           1 ( 2%)        ⚡- 75.3% ±  0.3%
+  cache_references    713K  ± 23.2K      675K  …  779K           0 ( 0%)        ⚡- 99.8% ±  1.1%
+  cache_misses        193K  ± 31.6K      130K  …  275K           1 ( 2%)        ⚡- 99.7% ±  1.8%
+  branch_misses      5.97M  ± 1.93M     4.60M  … 11.4M           6 (14%)        ⚡- 85.4% ±  2.5%
 ```
 
 ## TODO
