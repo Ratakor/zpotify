@@ -21,7 +21,7 @@ pub const usage =
     \\  prev       | Skip to previous track
     \\  next       | Skip to next track
     \\  repeat     | Get/Set repeat mode
-    \\  shuffle    | Toggle shuffle mode
+    \\  shuffle    | Toggle shuffle mode or force it to a specific state
     \\  seek       | Get/Set the position of the current track
     \\  vol        | Get/Set volume or increase/decrease volume by 10%
     \\  like       | Add the current track to your liked songs
@@ -118,7 +118,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "repeat")) {
         return cmd.repeat.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "shuffle")) {
-        return cmd.shuffle.exec(&client);
+        return cmd.shuffle.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "seek")) {
         return cmd.seek.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "vol")) {
