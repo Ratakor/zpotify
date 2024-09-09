@@ -25,6 +25,7 @@ pub const usage =
     \\  seek       | Get/Set the position of the current track
     \\  vol        | Get/Set volume or increase/decrease volume by 10%
     \\  like       | Add the current track to your liked songs
+    \\  devices    | List all available devices
     \\  waybar     | Display infos about the current playback for a waybar module
     \\  logout     | Remove the stored credentials from the config file
     \\  help       | Display information about a command
@@ -125,6 +126,8 @@ pub fn main() !void {
         return cmd.vol.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "like")) {
         return cmd.like.exec(&client);
+    } else if (std.mem.eql(u8, command, "devices")) {
+        return cmd.devices.exec(&client);
     } else if (std.mem.eql(u8, command, "waybar")) {
         return cmd.waybar.exec(&client, allocator);
     } else {

@@ -118,6 +118,17 @@ pub const Playlist = struct {
     uri: []const u8 = "",
 };
 
+pub const Device = struct {
+    id: ?[]const u8 = null,
+    is_active: bool = false,
+    is_private_session: bool = false,
+    is_restricted: bool = false,
+    name: []const u8 = "",
+    type: []const u8 = "",
+    volume_percent: ?u64 = null,
+    supports_volume: bool = false,
+};
+
 pub const ExternalUrls = struct {
     spotify: []const u8 = "https://open.spotify.com",
 };
@@ -143,7 +154,7 @@ pub fn Tracks(comptime saved: bool) type {
     };
 }
 
-const SimplifiedArtists = struct {
+pub const SimplifiedArtists = struct {
     href: []const u8 = "",
     limit: u64 = 0,
     next: ?[]const u8 = null,
@@ -153,7 +164,8 @@ const SimplifiedArtists = struct {
     items: []const SimplifiedArtist = &[_]SimplifiedArtist{},
 };
 
-const Artists = struct {
+// care the JSON is coated in another struct, get a look at getUserArtists()
+pub const Artists = struct {
     href: []const u8 = "",
     limit: u64 = 0,
     next: ?[]const u8 = null,
@@ -181,7 +193,7 @@ pub fn Albums(comptime saved: bool) type {
 }
 
 pub const Playlists = struct {
-    href: []const u8 ="",
+    href: []const u8 = "",
     limit: u64 = 0,
     next: ?[]const u8 = null,
     offset: u64 = 0,
@@ -190,17 +202,12 @@ pub const Playlists = struct {
     items: []const Playlist = &[_]Playlist{},
 };
 
+pub const Devices = struct {
+    devices: []const Device = &[_]Device{},
+};
+
 pub const PlaybackState = struct {
-    device: ?struct {
-        id: ?[]const u8 = null,
-        is_active: bool = false,
-        is_private_session: bool = false,
-        is_restricted: bool = false,
-        name: []const u8 = "",
-        type: []const u8 = "",
-        volume_percent: ?u64 = null,
-        supports_volume: bool = false,
-    } = null,
+    device: ?Device = null,
     repeat_state: []const u8 = "off",
     shuffle_state: bool = false,
     context: struct {
@@ -227,6 +234,11 @@ pub const Search = struct {
 /// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
 pub fn getPlaybackState(client: *Client) !std.json.Parsed(PlaybackState) {
     return client.sendRequest(PlaybackState, .GET, api_url ++ "/me/player", null);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/get-a-users-available-devices
+pub fn getDevices(client: *Client) !std.json.Parsed(Devices) {
+    return client.sendRequest(Devices, .GET, api_url ++ "/me/player/devices", null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/search
@@ -348,14 +360,22 @@ pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !std.json.Parsed(
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-followed
-pub fn getUserArtists(client: *Client, limit: u64, after: []const u8) !std.json.Parsed(Artists) {
-    const url = try std.fmt.allocPrint(
+pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !std.json.Parsed(Artists) {
+    const url = try if (after) |a| std.fmt.allocPrint(
         client.allocator,
         api_url ++ "/me/following?type=artist&limit={d}&after={s}",
-        .{ limit, after },
+        .{ limit, a },
+    ) else std.fmt.allocPrint(
+        client.allocator,
+        api_url ++ "/me/following?type=artist&limit={d}",
+        .{limit},
     );
     defer client.allocator.free(url);
-    return client.sendRequest(Artists, .GET, url, null);
+    const parsed = try client.sendRequest(struct { artists: Artists = .{} }, .GET, url, null);
+    return .{
+        .value = parsed.value.artists,
+        .arena = parsed.arena,
+    };
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/save-tracks-user

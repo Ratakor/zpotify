@@ -40,6 +40,7 @@ Commands:
   seek       | Get/Set the position of the current track
   vol        | Get/Set volume or increase/decrease volume by 10%
   like       | Add the current track to your liked songs
+  devices    | List all available devices
   waybar     | Display infos about the current playback for a waybar module
   logout     | Remove the stored credentials from the config file
   help       | Display information about a command
