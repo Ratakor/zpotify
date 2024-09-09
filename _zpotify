@@ -7,7 +7,7 @@ _zpotify() {
 
     case $state in
     cmd)
-        main_commands=('print\:"Display current track info in a specific format" play\:"Play a track, playlist, album, or artist" pause\:"Toggle pause state" prev\:"Skip to previous track" next\:"Skip to next track" repeat\:"Get/Set repeat mode" shuffle\:"Toggle shuffle mode" seek\:"Skip to a specific time (seconds) of the current track" vol\:"Get/Set volume" like\:"Add the current track to your liked songs" devices\:"List all available devices" waybar\:"Display infos about the current playback for a waybar module" logout\:"Remove the stored credentials from the config file" help\:"Display information about a command" version\:"Display program version"')
+        main_commands=('print\:"Display current track info in a specific format" play\:"Play a track, playlist, album, or artist from your library" pause\:"Toggle pause state" prev\:"Skip to previous track" next\:"Skip to next track" repeat\:"Get/Set repeat mode" shuffle\:"Toggle shuffle mode" seek\:"Skip to a specific time (seconds) of the current track" vol\:"Get/Set volume" like\:"Add the current track to your liked songs" devices\:"List all available devices" waybar\:"Display infos about the current playback for a waybar module" logout\:"Remove the stored credentials from the config file" help\:"Display information about a command" version\:"Display program version"')
         main_commands=($main_commands)
         _alternative "args:command:(($main_commands))"
         ;;
@@ -19,7 +19,9 @@ _zpotify() {
             _arguments -s "*:format:(($format_options))"
             ;;
         play)
-            _arguments -s "2:query_type:(track playlist album artist)"
+            _arguments -s \
+                "2:query_type:(track playlist album artist)" \
+                "--limit[Limit the number of results to display (1-50)]"
             ;;
         repeat)
             _arguments -s "2:repeat_mode:(track context off)"

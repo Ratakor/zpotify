@@ -172,7 +172,7 @@ pub fn sendRequest(
         },
         .not_found => {
             std.log.warn("No active device found ({d})", .{@intFromEnum(req.response.status)});
-            return error.NotFound;
+            return error.NoActiveDevice;
         },
         else => {
             const Error = struct {

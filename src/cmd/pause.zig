@@ -21,7 +21,7 @@ pub fn exec(client: *api.Client) !void {
     } else {
         std.log.info("Resuming playback", .{});
         api.startPlayback(client, null, null) catch |err| switch (err) {
-            error.NotFound => std.process.exit(1),
+            error.NoActiveDevice => std.process.exit(1),
             else => return err,
         };
     }

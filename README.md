@@ -31,7 +31,7 @@ Usage: zpotify [command] [options]
 
 Commands:
   print      | Display current track info in a specific format
-  play       | Play a track, playlist, album, or artist
+  play       | Play a track, playlist, album, or artist from your library
   pause      | Toggle pause state
   prev       | Skip to previous track
   next       | Skip to next track
@@ -82,6 +82,5 @@ Benchmark 2 (43 runs): ./run zpotify
 ```
 
 ## TODO
-- add `playlists` (Display a list of your playlists (e.g. for use with play and dmenu)
-- add `search` (TUI like [baton](https://github.com/joshuathompson/baton)?)
-- add tests
+- add test coverage
+- add `search` with TUI like [baton](https://github.com/joshuathompson/baton)

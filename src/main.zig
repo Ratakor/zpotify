@@ -16,7 +16,7 @@ pub const usage =
     \\
     \\Commands:
     \\  print      | Display current track info in a specific format
-    \\  play       | Play a track, playlist, album, or artist
+    \\  play       | Play a track, playlist, album, or artist from your library
     \\  pause      | Toggle pause state
     \\  prev       | Skip to previous track
     \\  next       | Skip to next track
@@ -109,7 +109,7 @@ pub fn main() !void {
     if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
     } else if (std.mem.eql(u8, command, "play")) {
-        return cmd.play.exec(&client, &args);
+        return cmd.play.exec(&client, allocator, &args);
     } else if (std.mem.eql(u8, command, "pause")) {
         return cmd.pause.exec(&client);
     } else if (std.mem.eql(u8, command, "prev")) {

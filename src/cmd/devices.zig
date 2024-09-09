@@ -13,7 +13,7 @@ pub fn exec(client: *api.Client) !void {
     defer devices.deinit();
 
     if (devices.value.devices.len == 0) {
-        std.log.err("No devices currently available", .{});
+        std.log.err("No device found", .{});
         std.process.exit(1);
     }
 
