@@ -131,8 +131,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "waybar")) {
         return cmd.waybar.exec(&client, allocator);
     } else {
-        std.log.err("Unknown command: '{s}'", .{command});
-        cmd.help.exec(null);
+        cmd.help.exec(command);
         std.process.exit(1);
     }
 }

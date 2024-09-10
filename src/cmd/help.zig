@@ -43,7 +43,7 @@ pub fn exec(command: ?[]const u8) void {
         } else if (std.mem.eql(u8, com, "version")) {
             stderr.print(cmd.version.usage, .{main.progname}) catch unreachable;
         } else {
-            std.log.warn("Unknown command: {s}", .{com});
+            std.log.warn("Unknown command: '{s}'", .{com});
             stderr.print(main.usage, .{main.progname}) catch unreachable;
         }
     } else {

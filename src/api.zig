@@ -108,7 +108,8 @@ pub const Playlist = struct {
         uri: []const u8 = "",
         display_name: ?[]const u8 = null,
     } = .{},
-    public: bool = false,
+    primary_color: ?[]const u8 = null, // not in the docs
+    public: ?bool = null, // nullable but not in the docs :D
     snapshot_id: []const u8 = "",
     tracks: struct {
         href: []const u8 = "",
@@ -226,7 +227,7 @@ pub const PlaybackState = struct {
 
 pub const Search = struct {
     tracks: ?Tracks(false) = null,
-    artists: ?SimplifiedArtists = null,
+    artists: ?Artists = null,
     albums: ?Albums(false) = null,
     playlists: ?Playlists = null,
 };
