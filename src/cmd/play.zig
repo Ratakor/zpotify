@@ -83,16 +83,14 @@ pub fn exec(
             error.NoActiveDevice => std.process.exit(1),
             else => return err,
         };
+        return;
     }
 
     switch (query.?) {
         .track => {
             const track = try getItemFromMenu(.track, client, allocator, limit);
             defer track.deinit();
-            api.startPlayback(client, null, &[_][]const u8{track.value.uri}) catch |err| switch (err) {
-                error.NoActiveDevice => std.process.exit(1),
-                else => return err,
-            };
+            try startPlayback(.track, client, allocator, track.value.uri);
             std.log.info("Playing track '{s}' from '{s}' by {s}", .{
                 track.value.name,
                 track.value.album.name,
@@ -102,10 +100,7 @@ pub fn exec(
         .playlist => {
             const playlist = try getItemFromMenu(.playlist, client, allocator, limit);
             defer playlist.deinit();
-            api.startPlayback(client, playlist.value.uri, null) catch |err| switch (err) {
-                error.NoActiveDevice => std.process.exit(1),
-                else => return err,
-            };
+            try startPlayback(.playlist, client, allocator, playlist.value.uri);
             std.log.info("Playing playlist '{s}' by {?s}", .{
                 playlist.value.name,
                 playlist.value.owner.display_name,
@@ -114,10 +109,7 @@ pub fn exec(
         .album => {
             const album = try getItemFromMenu(.album, client, allocator, limit);
             defer album.deinit();
-            api.startPlayback(client, album.value.uri, null) catch |err| switch (err) {
-                error.NoActiveDevice => std.process.exit(1),
-                else => return err,
-            };
+            try startPlayback(.album, client, allocator, album.value.uri);
             std.log.info("Playing album '{s}' by {s}", .{
                 album.value.name,
                 album.value.artists[0].name,
@@ -126,12 +118,67 @@ pub fn exec(
         .artist => {
             const artist = try getItemFromMenu(.artist, client, allocator, limit);
             defer artist.deinit();
-            api.startPlayback(client, artist.value.uri, null) catch |err| switch (err) {
-                error.NoActiveDevice => std.process.exit(1),
-                else => return err,
-            };
+            try startPlayback(.artist, client, allocator, artist.value.uri);
             std.log.info("Playing popular songs by {s}", .{artist.value.name});
         },
+    }
+}
+
+fn startPlayback(
+    comptime query: Query,
+    client: *api.Client,
+    allocator: std.mem.Allocator,
+    uri: []const u8,
+) !void {
+    if (query == .track) out: {
+        api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, null) catch |err| switch (err) {
+            error.NoActiveDevice => break :out,
+            else => return err,
+        };
+        return;
+    } else out: {
+        api.startPlayback(client, .{ .context_uri = uri }, null) catch |err| switch (err) {
+            error.NoActiveDevice => break :out,
+            else => return err,
+        };
+        return;
+    }
+
+    const devices = try api.getDevices(client);
+    defer devices.deinit();
+
+    if (devices.value.devices.len == 0) {
+        std.log.err("No device found", .{});
+        std.process.exit(1);
+    }
+
+    const id = blk: {
+        if (devices.value.devices.len == 1) {
+            break :blk devices.value.devices[0].id.?;
+        }
+
+        const dmenu_cmd = std.posix.getenv("DMENU") orelse "dmenu -i";
+        const result = try spawnMenu(allocator, dmenu_cmd, devices.value.devices);
+        defer allocator.free(result);
+
+        for (devices.value.devices) |device| {
+            if (std.mem.eql(u8, device.name, result)) {
+                break :blk device.id.?;
+            }
+        }
+        unreachable;
+    };
+
+    if (query == .track) {
+        api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id) catch |err| switch (err) {
+            error.NoActiveDevice => std.process.exit(1),
+            else => return err,
+        };
+    } else {
+        api.startPlayback(client, .{ .context_uri = uri }, id) catch |err| switch (err) {
+            error.NoActiveDevice => std.process.exit(1),
+            else => return err,
+        };
     }
 }
 
@@ -262,7 +309,9 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
             try writer.print("{s}\n", .{item.name});
         }
     }
-    try writer.writeAll("previous\nnext");
+    if (@TypeOf(items[0]) != api.Device) {
+        try writer.writeAll("previous\nnext");
+    }
     std.posix.close(p2c_pipe[1]);
 
     const wpr = std.posix.waitpid(fork_pid, 0);

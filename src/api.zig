@@ -257,30 +257,29 @@ pub fn search(
     defer client.allocator.free(url);
     return client.sendRequest(Search, .GET, url, null);
 }
+
 /// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
 pub fn startPlayback(
     client: *Client,
-    context_uri: ?[]const u8, // for album, artist or playlist
-    uris: ?[]const []const u8, // for tracks
+    data: ?union(enum) {
+        context_uri: []const u8, // for album, artist or playlist
+        uris: []const []const u8, // for tracks
+    },
+    device_id: ?[]const u8,
 ) !void {
-    const Body = struct {
-        context_uri: ?[]const u8,
-        uris: ?[]const []const u8,
-        offset: ?struct { // union
-            position: ?u64,
-            uri: ?[]const u8,
-        } = null,
-        position_ms: ?u64 = null,
-    };
-
-    const body = try std.json.stringifyAlloc(
-        client.allocator,
-        Body{ .context_uri = context_uri, .uris = uris },
-        .{ .emit_null_optional_fields = false },
-    );
+    const body = if (data) |uri|
+        try std.json.stringifyAlloc(client.allocator, uri, .{})
+    else
+        try client.allocator.dupe(u8, "{}");
     defer client.allocator.free(body);
 
-    return client.sendRequest(void, .PUT, api_url ++ "/me/player/play", body);
+    if (device_id) |id| {
+        var buf: [128]u8 = undefined;
+        const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/play?device_id={s}", .{id});
+        return client.sendRequest(void, .PUT, url, body);
+    } else {
+        return client.sendRequest(void, .PUT, api_url ++ "/me/player/play", body);
+    }
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/pause-a-users-playback
@@ -328,49 +327,45 @@ pub fn toggleShuffle(client: *Client, state: bool) !void {
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
 pub fn getUserPlaylists(client: *Client, limit: u64, offset: u64) !std.json.Parsed(Playlists) {
-    const url = try std.fmt.allocPrint(
-        client.allocator,
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(
+        &buf,
         api_url ++ "/me/playlists?limit={d}&offset={d}",
         .{ limit, offset },
     );
-    defer client.allocator.free(url);
     return client.sendRequest(Playlists, .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
 pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !std.json.Parsed(Tracks(true)) {
-    const url = try std.fmt.allocPrint(
-        client.allocator,
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(
+        &buf,
         api_url ++ "/me/tracks?limit={d}&offset={d}",
         .{ limit, offset },
     );
-    defer client.allocator.free(url);
     return client.sendRequest(Tracks(true), .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-albums
 pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !std.json.Parsed(Albums(true)) {
-    const url = try std.fmt.allocPrint(
-        client.allocator,
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(
+        &buf,
         api_url ++ "/me/albums?limit={d}&offset={d}",
         .{ limit, offset },
     );
-    defer client.allocator.free(url);
     return client.sendRequest(Albums(true), .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-followed
 pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !std.json.Parsed(Artists) {
-    const url = try if (after) |a| std.fmt.allocPrint(
-        client.allocator,
+    var buf: [128]u8 = undefined;
+    const url = try if (after) |a| std.fmt.bufPrint(
+        &buf,
         api_url ++ "/me/following?type=artist&limit={d}&after={s}",
         .{ limit, a },
-    ) else std.fmt.allocPrint(
-        client.allocator,
-        api_url ++ "/me/following?type=artist&limit={d}",
-        .{limit},
-    );
-    defer client.allocator.free(url);
+    ) else std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&limit={d}", .{limit});
     const parsed = try client.sendRequest(struct { artists: Artists = .{} }, .GET, url, null);
     return .{
         .value = parsed.value.artists,
