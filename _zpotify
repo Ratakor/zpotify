@@ -14,7 +14,7 @@ _zpotify() {
     args)
         case $line[1] in
         print)
-            format_options=('{title}\:"prints the title of the current track" {state}\:"prints the current playback state" {album}\:"prints the name of the current album" {artist}\:"prints the name of the first artist of the current track" {artists}\:"prints all artists" {device}\:"prints the name of the current device" {volume}\:"prints the current volume" {repeat}\:"prints the current repeat state" {shuffle}\:"prints the current shuffle state" {bar\\\:50}\:"prints a progress bar" {progress}\:"prints the current progress as min:sec" {duration}\:"prints the duration of the current track as min:sec" {url}\:"prints the url of the current track" {album_url}\:"prints the url of the current album"')
+            format_options=('{title}\:"prints the title of the current track" {state}\:"prints the current playback state" {album}\:"prints the name of the current album" {artist}\:"prints the name of the first artist of the current track" {artists}\:"prints all artists" {device}\:"prints the name of the current device" {volume}\:"prints the current volume" {repeat}\:"prints the current repeat state" {shuffle}\:"prints the current shuffle state" {bar\\\:50}\:"prints a progress bar" {progress}\:"prints the current progress as min:sec" {duration}\:"prints the duration of the current track as min:sec" {url}\:"prints the URL of the current track" {image}\:"prints the URL of the current track album cover" {icon}\:"prints the URL of the current track album cover with the smallest size"')
             format_options=($format_options)
             _arguments -s "*:format:(($format_options))"
             ;;

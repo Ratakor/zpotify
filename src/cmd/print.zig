@@ -21,8 +21,9 @@ pub const usage =
     \\  {{bar:n}}: prints a progress bar of length n (default is 50)
     \\  {{progress}}: prints the current progress as min:sec
     \\  {{duration}}: prints the duration of the current track as min:sec
-    \\  {{url}}: prints the url of the current track
-    \\  {{album_url}}: prints the url of the current album
+    \\  {{url}}: prints the URL of the current track
+    \\  {{image}}: prints the URL of the current track's album cover
+    \\  {{icon}}: prints the URL of the current track's album cover with the smallest size
     \\  \{{: prints '{{'
     \\  \}}: prints '}}'
     \\
@@ -40,7 +41,7 @@ const default_format =
     \\Shuffle: {shuffle}
     \\Progress: {bar} {progress} / {duration}
     \\URL: {url}
-    \\Album URL: {album_url}
+    \\Image URL: {image}
     \\State: {state}
     \\
 ;
@@ -242,12 +243,6 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
         } else {
             try writer.writeAll("null");
         }
-    } else if (std.mem.eql(u8, arg, "album_url")) {
-        if (info.item) |track| {
-            try writer.writeAll(track.album.external_urls.spotify);
-        } else {
-            try writer.writeAll("null");
-        }
     } else if (std.mem.startsWith(u8, arg, "bar")) {
         const bar_len = blk: {
             const idx = std.mem.indexOfScalar(u8, arg, ':') orelse {
@@ -266,6 +261,20 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
             const progress_len = (progress * bar_len) / duration;
             try writer.writeBytesNTimes("█", progress_len);
             try writer.writeByteNTimes(' ', bar_len - progress_len);
+        }
+    } else if (std.mem.eql(u8, arg, "image")) {
+        if (info.item) |track| {
+            // assume at least one image and that the first one is the largest
+            try writer.writeAll(track.album.images[0].url);
+        } else {
+            try writer.writeAll("null");
+        }
+    } else if (std.mem.eql(u8, arg, "icon")) {
+        if (info.item) |track| {
+            // assume at least one image and that the last one is the smallest
+            try writer.writeAll(track.album.images[track.album.images.len - 1].url);
+        } else {
+            try writer.writeAll("null");
         }
     } else {
         std.log.err("Unknown format argument: {s}", .{arg});
