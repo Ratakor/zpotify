@@ -138,7 +138,8 @@ fn startPlayback(
                 break :blk device.id.?;
             }
         }
-        unreachable;
+        std.log.err("Invalid selection: '{s}'", .{result});
+        std.process.exit(1);
     };
 
     if (query == .track) {
@@ -244,7 +245,8 @@ fn getItemFromMenu(
                     return res;
                 }
             }
-            unreachable;
+            std.log.err("Invalid selection: '{s}'", .{result});
+            std.process.exit(1);
         }
     }
 }
