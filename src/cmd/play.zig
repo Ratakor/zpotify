@@ -9,10 +9,9 @@ pub const usage =
     \\             If no arguments are provided, playback will be resumed for the current device
     \\             Change the $DMENU environment variable to use a different menu program (default: dmenu -i)
     \\
-    \\Flags:
-    \\  -l, --limit [1-50]    Limit the number of results to display (default: 10)
-    \\
 ;
+
+const limit = 50;
 
 const Query = enum {
     track,
@@ -42,53 +41,26 @@ const Query = enum {
 pub fn exec(
     client: *api.Client,
     allocator: std.mem.Allocator,
-    args: *std.process.ArgIterator,
+    arg: ?[]const u8,
 ) !void {
-    var limit: u64 = 10;
-    var query: ?Query = null;
-
-    while (args.next()) |arg| {
-        if (std.mem.eql(u8, arg, "-l") or std.mem.eql(u8, arg, "--limit")) {
-            limit = blk: {
-                if (args.next()) |lim_str| {
-                    break :blk std.fmt.parseUnsigned(u64, lim_str, 10) catch |err| {
-                        std.log.err("Invalid limit: {}", .{err});
-                        help.exec("play");
-                        std.process.exit(1);
-                    };
-                } else {
-                    std.log.err("Missing limit value", .{});
-                    help.exec("play");
-                    std.process.exit(1);
-                }
-            };
-        } else {
-            query = std.meta.stringToEnum(Query, arg) orelse {
-                std.log.err("Invalid query type: '{s}'", .{arg});
-                help.exec("play");
-                std.process.exit(1);
-            };
-        }
-    }
-
-    if (limit == 0 or limit > 50) {
-        std.log.err("Limit must be between 1 and 50", .{});
-        help.exec("play");
-        std.process.exit(1);
-    }
-
-    if (query == null) {
+    const query = if (arg) |value| blk: {
+        break :blk std.meta.stringToEnum(Query, value) orelse {
+            std.log.err("Invalid query type: '{s}'", .{value});
+            help.exec("play");
+            std.process.exit(1);
+        };
+    } else {
         std.log.info("Resuming playback", .{});
         api.startPlayback(client, null, null) catch |err| switch (err) {
             error.NoActiveDevice => std.process.exit(1),
             else => return err,
         };
         return;
-    }
+    };
 
-    switch (query.?) {
+    switch (query) {
         .track => {
-            const track = try getItemFromMenu(.track, client, allocator, limit);
+            const track = try getItemFromMenu(.track, client, allocator);
             defer track.deinit();
             try startPlayback(.track, client, allocator, track.value.uri);
             std.log.info("Playing track '{s}' from '{s}' by {s}", .{
@@ -98,7 +70,7 @@ pub fn exec(
             });
         },
         .playlist => {
-            const playlist = try getItemFromMenu(.playlist, client, allocator, limit);
+            const playlist = try getItemFromMenu(.playlist, client, allocator);
             defer playlist.deinit();
             try startPlayback(.playlist, client, allocator, playlist.value.uri);
             std.log.info("Playing playlist '{s}' by {?s}", .{
@@ -107,7 +79,7 @@ pub fn exec(
             });
         },
         .album => {
-            const album = try getItemFromMenu(.album, client, allocator, limit);
+            const album = try getItemFromMenu(.album, client, allocator);
             defer album.deinit();
             try startPlayback(.album, client, allocator, album.value.uri);
             std.log.info("Playing album '{s}' by {s}", .{
@@ -116,7 +88,7 @@ pub fn exec(
             });
         },
         .artist => {
-            const artist = try getItemFromMenu(.artist, client, allocator, limit);
+            const artist = try getItemFromMenu(.artist, client, allocator);
             defer artist.deinit();
             try startPlayback(.artist, client, allocator, artist.value.uri);
             std.log.info("Playing popular songs by {s}", .{artist.value.name});
@@ -187,7 +159,6 @@ fn getItemFromMenu(
     comptime query: Query,
     client: *api.Client,
     allocator: std.mem.Allocator,
-    limit: u64,
 ) !query.Type() {
     const dmenu_cmd = std.posix.getenv("DMENU") orelse "dmenu -i";
 

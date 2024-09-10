@@ -109,7 +109,7 @@ pub fn main() !void {
     if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
     } else if (std.mem.eql(u8, command, "play")) {
-        return cmd.play.exec(&client, allocator, &args);
+        return cmd.play.exec(&client, allocator, args.next());
     } else if (std.mem.eql(u8, command, "pause")) {
         return cmd.pause.exec(&client);
     } else if (std.mem.eql(u8, command, "prev")) {
