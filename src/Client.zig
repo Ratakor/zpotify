@@ -121,10 +121,35 @@ pub fn getSavePath(allocator: std.mem.Allocator) ![]const u8 {
 pub fn sendRequest(
     self: *Client,
     comptime T: type,
-    method: std.http.Method,
+    comptime method: std.http.Method,
     url: []const u8,
     body: ?[]const u8,
 ) !if (T == void) void else std.json.Parsed(T) {
+    if (T == void) {
+        return self.sendRequestLeaky(T, method, url, body, undefined);
+    }
+
+    var parsed = std.json.Parsed(T){
+        .arena = try self.allocator.create(std.heap.ArenaAllocator),
+        .value = undefined,
+    };
+    errdefer self.allocator.destroy(parsed.arena);
+    parsed.arena.* = std.heap.ArenaAllocator.init(self.allocator);
+    errdefer parsed.arena.deinit();
+
+    parsed.value = try self.sendRequestLeaky(T, method, url, body, parsed.arena.allocator());
+
+    return parsed;
+}
+
+pub fn sendRequestLeaky(
+    self: *Client,
+    comptime T: type,
+    comptime method: std.http.Method,
+    url: []const u8,
+    body: ?[]const u8,
+    arena: std.mem.Allocator,
+) !T {
     const uri = try std.Uri.parse(url);
     const auth_header = try self.getAuthHeader();
     defer self.allocator.free(auth_header);
@@ -156,7 +181,7 @@ pub fn sendRequest(
             if (T != void) {
                 var json_reader = std.json.reader(self.allocator, req.reader());
                 defer json_reader.deinit();
-                return std.json.parseFromTokenSource(T, self.allocator, &json_reader, .{
+                return std.json.parseFromTokenSourceLeaky(T, arena, &json_reader, .{
                     .allocate = .alloc_always,
                     .ignore_unknown_fields = true,
                 });
