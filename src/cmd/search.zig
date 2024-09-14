@@ -2,7 +2,7 @@ const std = @import("std");
 const spoon = @import("spoon");
 const api = @import("../api.zig");
 const ui = @import("../ui.zig");
-const help = @import("../cmd.zig").help;
+const cmd = @import("../cmd.zig");
 
 // this is allocation fest
 // TODO: add number in ui like in vim?
@@ -32,12 +32,12 @@ pub fn exec(
     const kind = if (args.next()) |arg| blk: {
         break :blk std.meta.stringToEnum(Kind, arg) orelse {
             std.log.err("Invalid query type: '{s}'", .{arg});
-            help.exec("search");
+            cmd.help.exec("search");
             std.process.exit(1);
         };
     } else {
         std.log.err("Missing query type", .{});
-        help.exec("search");
+        cmd.help.exec("search");
         std.process.exit(1);
     };
 
@@ -53,7 +53,7 @@ pub fn exec(
         }
         if (builder.items.len == 0) {
             std.log.err("Missing query", .{});
-            help.exec("search");
+            cmd.help.exec("search");
             std.process.exit(1);
         }
         break :blk try std.mem.join(allocator, " ", builder.items);
@@ -138,16 +138,10 @@ fn loop() !void {
                 {
                     current_table.selected += limit;
                     if (current_table.selected - current_table.start >= ui.term.height - 5) {
-                        // std.log.debug("start: {d}, selected: {d} term.height {d}, selected row {d}", .{
-                        //     current_table.start,
-                        //     current_table.selected,
-                        //     ui.term.height,
-                        // });
-                        // TODO += @min(limit, ???)
                         current_table.start += limit;
-                        // current_table.start = current_table.selected - (ui.term.height - 5);
-                        // if (self.selected - term.height - start
-                        // current_table.start += 1 + current_table.selected - (ui.term.height - 5);
+                        // make selected row be at the end of the screen to be the opposite of 'u'
+                        const selected_row = 1 + current_table.selected - current_table.start;
+                        current_table.start -= (ui.term.height - 5) - selected_row;
                     }
                     try render();
                 }
@@ -171,9 +165,9 @@ fn loop() !void {
             } else if (in.eqlDescription("s")) {
                 // TODO: save
             } else if (in.eqlDescription("-") or in.eqlDescription("_")) {
-                // TODO: vol -|= 10
+                // try cmd.vol.exec(current_table.client, "down"); // TODO: display log correctly
             } else if (in.eqlDescription("+") or in.eqlDescription("=")) {
-                // TODO: if (vol <= 90) vol += 10 else vol = 100
+                // try cmd.vol.exec(current_table.client, "up"); // TODO: display log correctly
             } else if (in.eqlDescription("?")) {
                 // TODO: help?
             } else if (in.eqlDescription("/")) {
@@ -183,6 +177,16 @@ fn loop() !void {
             }
         }
     }
+}
+
+// fn drawNotification(msg: []const u8, err: ?anyerror) !void {
+fn drawNotification(msg: union { err: anyerror, str: []const u8 }) !void {
+    var rc = try ui.term.getRenderContext();
+    defer rc.done() catch {};
+
+    // TODO: if err display in red and bold else in green and bold?
+    //       just text or text with a border?
+    _ = msg;
 }
 
 // TODO: in ui.zig?
@@ -215,11 +219,11 @@ fn drawFooter(rc: *spoon.Term.RenderContext) !void {
     try rc.moveCursorTo(ui.term.height - 2, 0);
     try rc.setAttribute(.{ .fg = .none, .bold = true });
     var rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().print("Showing {d} of {d} {s}{s}", .{
+    const kind = @tagName(current_table.list);
+    try rpw.writer().print("Showing {d} of {d} {s}", .{
         current_table.len(),
         current_table.total,
-        current_table.getKind(),
-        if (current_table.len() == 1) "" else "s",
+        kind[0 .. kind.len - @intFromBool(current_table.len() == 1)],
     });
     try rpw.pad();
     try rc.moveCursorTo(ui.term.height - 1, 0);
@@ -249,9 +253,9 @@ const Table = struct {
     selected: usize = 0,
 
     total: usize = 0,
-    has_next: bool,
-    // fetchFn: fn (*Table) anyerror!bool = undefined,
-    query: []const u8,
+    has_next: bool = true,
+    fetchFn: *const fn (*Table) anyerror!void,
+    query: []const u8, // can also be an id
 
     prev: ?*Table = null,
     next: std.AutoHashMapUnmanaged(usize, *Table) = .{},
@@ -274,13 +278,19 @@ const Table = struct {
             .client = client,
             .allocator = allocator,
             .query = query,
-            .has_next = true,
+            .fetchFn = switch (kind) {
+                .track => fetchTracksSearch,
+                .artist => fetchArtistsSearch,
+                .album => fetchAlbumsSearch,
+                .playlist => fetchPlaylistsSearch,
+            },
             .title = title,
         };
         _ = try table.fetchNext();
         return table;
     }
 
+    // make sure to init query, fetchFn, and title
     fn makeNextTable(prev: *Table, kind: Kind) !*Table {
         const table = try prev.allocator.create(Table);
         table.* = .{
@@ -292,7 +302,7 @@ const Table = struct {
             .client = prev.client,
             .allocator = prev.allocator,
             .query = undefined,
-            .has_next = false,
+            .fetchFn = undefined,
             .title = undefined,
             .prev = prev,
         };
@@ -300,42 +310,55 @@ const Table = struct {
         return table;
     }
 
+    fn fetchTracksSearch(self: *Table) !void {
+        const result = try api.search(self.client, self.query, "track", limit, self.len());
+        try self.list.tracks.appendSlice(self.allocator, result.tracks.?.items);
+        self.total = result.tracks.?.total;
+        self.has_next = result.tracks.?.next != null;
+    }
+
+    fn fetchArtistsSearch(self: *Table) !void {
+        const result = try api.search(self.client, self.query, "artist", limit, self.len());
+        try self.list.artists.appendSlice(self.allocator, result.artists.?.items);
+        self.total = result.artists.?.total;
+        self.has_next = result.artists.?.next != null;
+    }
+
+    fn fetchAlbumsSearch(self: *Table) !void {
+        const result = try api.search(self.client, self.query, "album", limit, self.len());
+        try self.list.albums.appendSlice(self.allocator, result.albums.?.items);
+        self.total = result.albums.?.total;
+        self.has_next = result.albums.?.next != null;
+    }
+
+    fn fetchPlaylistsSearch(self: *Table) !void {
+        const result = try api.search(self.client, self.query, "playlist", limit, self.len());
+        try self.list.playlists.appendSlice(self.allocator, result.playlists.?.items);
+        self.total = result.playlists.?.total;
+        self.has_next = result.playlists.?.next != null;
+    }
+
+    fn fetchAlbumsArtist(self: *Table) !void {
+        const albums = try api.getArtistAlbums(self.client, self.query, limit, self.len());
+        try self.list.albums.appendSlice(self.allocator, albums.items);
+        self.total = albums.total;
+        self.has_next = albums.next != null;
+    }
+
+    fn fetchTracksPlaylist(self: *Table) !void {
+        const tracks = try api.getPlaylistTracks(self.client, self.query, limit, self.len());
+        for (tracks.items) |item| {
+            try self.list.tracks.append(self.allocator, item.track);
+        }
+        self.total = tracks.total;
+        self.has_next = tracks.next != null;
+    }
+
     pub fn fetchNext(self: *Table) !bool {
         if (!self.has_next) {
             return false;
         }
-
-        const search_result = try api.search(
-            self.client,
-            self.query,
-            self.getKind(),
-            limit,
-            self.len(),
-        );
-
-        switch (self.list) {
-            .tracks => |*list| {
-                try list.appendSlice(self.allocator, search_result.tracks.?.items);
-                self.total = search_result.tracks.?.total;
-                self.has_next = search_result.tracks.?.next != null;
-            },
-            .artists => |*list| {
-                try list.appendSlice(self.allocator, search_result.artists.?.items);
-                self.total = search_result.artists.?.total;
-                self.has_next = search_result.artists.?.next != null;
-            },
-            .albums => |*list| {
-                try list.appendSlice(self.allocator, search_result.albums.?.items);
-                self.total = search_result.albums.?.total;
-                self.has_next = search_result.albums.?.next != null;
-            },
-            .playlists => |*list| {
-                try list.appendSlice(self.allocator, search_result.playlists.?.items);
-                self.total = search_result.playlists.?.total;
-                self.has_next = search_result.playlists.?.next != null;
-            },
-        }
-
+        try self.fetchFn(self);
         return true;
     }
 
@@ -375,33 +398,22 @@ const Table = struct {
 
         switch (self.list) {
             .tracks => return null,
-            // TODO: too slow
             .artists => |list| {
                 const artist = list.items[self.selected];
                 const next_table = try self.makeNextTable(.album);
+                next_table.query = artist.id;
+                next_table.fetchFn = fetchAlbumsArtist;
                 next_table.title = try std.fmt.allocPrint(next_table.allocator, "zpotify: {s}", .{
                     artist.name,
                 });
-
-                while (true) {
-                    const albums = try api.getArtistAlbums(
-                        next_table.client,
-                        artist.id,
-                        limit_max,
-                        next_table.len(),
-                    );
-                    try next_table.list.albums.appendSlice(next_table.allocator, albums.items);
-                    next_table.total = albums.total;
-                    if (albums.next == null) {
-                        break;
-                    }
-                }
-
+                _ = try next_table.fetchNext();
                 return next_table;
             },
             .albums => |list| {
                 const album = list.items[self.selected];
                 const next_table = try self.makeNextTable(.track);
+                next_table.query = album.id;
+                next_table.has_next = false; // it's easier to fetch all tracks at once
                 next_table.title = blk: {
                     var builder = std.ArrayList(u8).init(next_table.allocator);
                     try builder.appendSlice("zpotify: ");
@@ -436,29 +448,14 @@ const Table = struct {
             .playlists => |list| {
                 const playlist = list.items[self.selected];
                 const next_table = try self.makeNextTable(.track);
+                next_table.query = playlist.id;
+                next_table.fetchFn = fetchTracksPlaylist;
                 next_table.title = try std.fmt.allocPrint(
                     next_table.allocator,
                     "zpotify: {s} - {s}",
                     .{ playlist.name, playlist.owner.display_name orelse playlist.owner.id },
                 );
-
-                // TODO: too slow
-                while (true) {
-                    const tracks = try api.getPlaylistTracks(
-                        next_table.client,
-                        playlist.id,
-                        limit_max,
-                        next_table.len(),
-                    );
-                    for (tracks.items) |item| {
-                        try next_table.list.tracks.append(next_table.allocator, item.track);
-                    }
-                    next_table.total = tracks.total;
-                    if (tracks.next == null) {
-                        break;
-                    }
-                }
-
+                _ = try next_table.fetchNext();
                 return next_table;
             },
         }
@@ -483,10 +480,6 @@ const Table = struct {
                 try api.startPlayback(self.client, .{ .context_uri = uri }, null);
             },
         }
-    }
-
-    pub fn getKind(self: Table) []const u8 {
-        return @tagName(self.list)[0 .. @tagName(self.list).len - 1];
     }
 
     pub fn len(self: Table) usize {
