@@ -17,7 +17,7 @@ pub const scopes = [_][]const u8{
 
 pub const Track = struct {
     album: Album = .{},
-    artists: []const SimplifiedArtist,
+    artists: []const SimplifiedArtist = &[_]SimplifiedArtist{},
     available_markets: []const []const u8 = &[_][]const u8{},
     disc_number: u64 = 0,
     duration_ms: u64 = 0,
@@ -55,10 +55,7 @@ pub const SimplifiedArtist = struct {
 
 pub const Artist = struct {
     external_urls: ExternalUrls = .{},
-    followers: struct {
-        href: ?[]const u8 = null,
-        total: u64 = 0,
-    },
+    followers: Followers = .{},
     genres: []const []const u8 = &[_][]const u8{},
     href: []const u8 = "",
     id: []const u8 = "",
@@ -86,6 +83,7 @@ pub const Album = struct {
     type: []const u8 = "album",
     uri: []const u8 = "",
     artists: []const SimplifiedArtist = &[_]SimplifiedArtist{},
+    album_group: []const u8 = "",
 };
 
 pub const Playlist = struct {
@@ -98,17 +96,14 @@ pub const Playlist = struct {
     name: []const u8 = "",
     owner: struct {
         external_urls: ExternalUrls = .{},
-        followers: struct {
-            href: ?[]const u8 = null,
-            total: u64 = 0,
-        } = .{},
+        followers: Followers = .{},
         href: []const u8 = "",
         id: []const u8 = "",
         type: []const u8 = "user",
         uri: []const u8 = "",
         display_name: ?[]const u8 = null,
     } = .{},
-    primary_color: ?[]const u8 = null, // not in the docs
+    // primary_color: ?[]const u8 = null,
     public: ?bool = null, // nullable but not in the docs :D
     snapshot_id: []const u8 = "",
     tracks: struct {
@@ -140,7 +135,15 @@ pub const Image = struct {
     width: ?u64 = null,
 };
 
-pub fn Tracks(comptime saved: bool) type {
+pub const Followers = struct {
+    href: ?[]const u8 = null,
+    total: u64 = 0,
+};
+
+// used for Tracks() and Albums()
+const Kind = enum { default, saved, playlist };
+
+pub fn Tracks(comptime kind: Kind) type {
     return struct {
         href: []const u8 = "",
         limit: u64 = 0,
@@ -148,10 +151,30 @@ pub fn Tracks(comptime saved: bool) type {
         offset: u64 = 0,
         previous: ?[]const u8 = null,
         total: u64 = 0,
-        items: []const if (saved) struct {
-            track: Track,
-            added_at: []const u8,
-        } else Track,
+        items: []const switch (kind) {
+            .default => Track,
+            .saved => struct {
+                track: Track = .{},
+                added_at: []const u8,
+            },
+            .playlist => struct {
+                added_at: []const u8,
+                added_by: struct { // nullable on very old playlists
+                    external_urls: ExternalUrls = .{},
+                    followers: Followers = .{},
+                    href: []const u8 = "",
+                    id: []const u8 = "",
+                    type: []const u8 = "user",
+                    uri: []const u8 = "",
+                } = .{},
+                is_local: bool = false,
+                track: Track = .{}, // can be an Episode
+                // primary_color: ?[]const u8 = null,
+                // video_thumbnail: struct {
+                //     url: ?[]const u8 = null,
+                // } = .{},
+            },
+        },
     };
 }
 
@@ -178,7 +201,7 @@ pub const Artists = struct {
     items: []const Artist = &[_]Artist{},
 };
 
-pub fn Albums(comptime saved: bool) type {
+pub fn Albums(comptime kind: Kind) type {
     return struct {
         href: []const u8 = "",
         limit: u64 = 0,
@@ -186,10 +209,14 @@ pub fn Albums(comptime saved: bool) type {
         offset: u64 = 0,
         previous: ?[]const u8 = null,
         total: u64 = 0,
-        items: []const if (saved) struct {
-            album: Album,
-            added_at: []const u8,
-        } else Album,
+        items: []const switch (kind) {
+            .default => Album,
+            .saved => struct {
+                album: Album = .{},
+                added_at: []const u8 = "",
+            },
+            else => unreachable,
+        },
     };
 }
 
@@ -225,9 +252,9 @@ pub const PlaybackState = struct {
 };
 
 pub const Search = struct {
-    tracks: ?Tracks(false) = null,
+    tracks: ?Tracks(.default) = null,
     artists: ?Artists = null,
-    albums: ?Albums(false) = null,
+    albums: ?Albums(.default) = null,
     playlists: ?Playlists = null,
 };
 
@@ -352,25 +379,25 @@ pub fn getUserPlaylists(client: *Client, limit: u64, offset: u64) !Playlists {
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
-pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !Tracks(true) {
+pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !Tracks(.saved) {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
         api_url ++ "/me/tracks?limit={d}&offset={d}",
         .{ limit, offset },
     );
-    return client.sendRequest(Tracks(true), .GET, url, null);
+    return client.sendRequest(Tracks(.saved), .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-albums
-pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !Albums(true) {
+pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !Albums(.saved) {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
         api_url ++ "/me/albums?limit={d}&offset={d}",
         .{ limit, offset },
     );
-    return client.sendRequest(Albums(true), .GET, url, null);
+    return client.sendRequest(Albums(.saved), .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-followed
@@ -406,12 +433,50 @@ pub fn getArtist(client: *Client, id: []const u8) !Artist {
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-an-albums-tracks
-pub fn getAlbumTracks(client: *Client, id: []const u8, limit: usize, offset: usize) !Tracks(false) {
+pub fn getAlbumTracks(
+    client: *Client,
+    id: []const u8,
+    limit: usize,
+    offset: usize,
+) !Tracks(.default) {
     var buf: [256]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
         api_url ++ "/albums/{s}/tracks?limit={d}&offset={d}",
         .{ id, limit, offset },
     );
-    return client.sendRequest(Tracks(false), .GET, url, null);
+    return client.sendRequest(Tracks(.default), .GET, url, null);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
+pub fn getPlaylistTracks(
+    client: *Client,
+    id: []const u8,
+    limit: usize,
+    offset: usize,
+) !Tracks(.playlist) {
+    var buf: [256]u8 = undefined;
+    const url = try std.fmt.bufPrint(
+        &buf,
+        api_url ++ "/playlists/{s}/tracks?limit={d}&offset={d}",
+        .{ id, limit, offset },
+    );
+    return client.sendRequest(Tracks(.playlist), .GET, url, null);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums
+pub fn getArtistAlbums(
+    client: *Client,
+    id: []const u8,
+    // include_groups: []const u8, // album, single, appears_on, compilation
+    limit: usize,
+    offset: usize,
+) !Albums(.default) {
+    var buf: [256]u8 = undefined;
+    const url = try std.fmt.bufPrint(
+        &buf,
+        api_url ++ "/artists/{s}/albums?limit={d}&offset={d}",
+        .{ id, limit, offset },
+    );
+    return client.sendRequest(Albums(.default), .GET, url, null);
 }

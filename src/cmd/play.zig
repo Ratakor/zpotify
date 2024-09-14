@@ -30,9 +30,9 @@ const Query = enum {
 
     fn ListType(comptime query: Query) type {
         return switch (query) {
-            .track => api.Tracks(true),
+            .track => api.Tracks(.saved),
             .playlist => api.Playlists,
-            .album => api.Albums(true),
+            .album => api.Albums(.saved),
             .artist => api.Artists,
         };
     }

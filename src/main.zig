@@ -104,10 +104,10 @@ pub fn main() !void {
 
     if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
+    } else if (std.mem.eql(u8, command, "search")) {
+        return cmd.search.exec(&client, std.heap.raw_c_allocator, &args);
     } else if (std.mem.eql(u8, command, "play")) {
         return cmd.play.exec(&client, std.heap.raw_c_allocator, args.next());
-    } else if (std.mem.eql(u8, command, "search")) {
-        return cmd.search.exec(&client, std.heap.c_allocator, &args); // TODO
     } else if (std.mem.eql(u8, command, "pause")) {
         return cmd.pause.exec(&client);
     } else if (std.mem.eql(u8, command, "prev")) {
