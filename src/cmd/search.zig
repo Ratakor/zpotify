@@ -22,7 +22,7 @@ var previous_tables: std.ArrayList(*Table) = undefined;
 
 pub fn exec(
     client: *api.Client,
-    allocator: std.mem.Allocator,
+    allocator: std.mem.Allocator, // TODO
     args: *std.process.ArgIterator,
 ) !void {
     const query_type = if (args.next()) |arg| blk: {
@@ -291,12 +291,11 @@ const Table = struct {
         }
 
         if (self.list == .album_tracks) {
-            const tracks = try api.getAlbumTracksLeaky(
+            const tracks = try api.getAlbumTracks(
                 self.client,
                 self.query,
                 limit,
                 self.len(),
-                self.arena.allocator(),
             );
             try self.list.album_tracks.appendSlice(tracks.items);
             self.total = tracks.total;
@@ -304,13 +303,12 @@ const Table = struct {
             return true;
         }
 
-        const search_result = try api.searchLeaky(
+        const search_result = try api.search(
             self.client,
             self.query,
             self.kind(),
             limit,
             self.len(),
-            self.arena.allocator(),
         );
 
         switch (self.list) {

@@ -62,20 +62,19 @@ pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
         error.NotPlaying => std.process.exit(1),
         else => return err,
     };
-    defer playback_state.deinit();
 
     const stdout = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout);
     const writer = bw.writer();
 
     if (args.next()) |arg2| {
-        try format(writer, arg2, playback_state.value);
+        try format(writer, arg2, playback_state);
         while (args.next()) |arg| {
             try writer.writeAll(" ");
-            try format(writer, arg, playback_state.value);
+            try format(writer, arg, playback_state);
         }
     } else {
-        try format(writer, default_format, playback_state.value);
+        try format(writer, default_format, playback_state);
     }
 
     try bw.flush();

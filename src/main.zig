@@ -84,10 +84,6 @@ fn coloredLog(
 }
 
 pub fn main() !void {
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
-    defer std.debug.assert(gpa.deinit() == .ok);
-    const allocator = gpa.allocator();
-
     var args = std.process.args();
     progname = args.next().?;
     const command = args.next() orelse {
@@ -96,22 +92,22 @@ pub fn main() !void {
     };
 
     if (std.mem.eql(u8, command, "logout")) {
-        return cmd.logout.exec(allocator);
+        return cmd.logout.exec(std.heap.c_allocator);
     } else if (std.mem.eql(u8, command, "help")) {
         return cmd.help.exec(args.next());
     } else if (std.mem.eql(u8, command, "version")) {
         return cmd.version.exec();
     }
 
-    var client = try Client.init(allocator);
+    var client = try Client.init(std.heap.c_allocator, std.heap.raw_c_allocator);
     defer client.deinit();
 
     if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
     } else if (std.mem.eql(u8, command, "play")) {
-        return cmd.play.exec(&client, allocator, args.next());
+        return cmd.play.exec(&client, std.heap.raw_c_allocator, args.next());
     } else if (std.mem.eql(u8, command, "search")) {
-        return cmd.search.exec(&client, allocator, &args);
+        return cmd.search.exec(&client, std.heap.c_allocator, &args); // TODO
     } else if (std.mem.eql(u8, command, "pause")) {
         return cmd.pause.exec(&client);
     } else if (std.mem.eql(u8, command, "prev")) {
@@ -131,7 +127,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "devices")) {
         return cmd.devices.exec(&client);
     } else if (std.mem.eql(u8, command, "waybar")) {
-        return cmd.waybar.exec(&client, allocator);
+        return cmd.waybar.exec(&client, std.heap.raw_c_allocator);
     } else {
         cmd.help.exec(command);
         std.process.exit(1);

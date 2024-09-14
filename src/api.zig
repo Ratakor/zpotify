@@ -203,9 +203,8 @@ pub const Playlists = struct {
     items: []const Playlist = &[_]Playlist{},
 };
 
-pub const Devices = struct {
-    devices: []const Device = &[_]Device{},
-};
+// care the JSON is coated in a struct, get a look at getDevices()
+pub const Devices = []const Device;
 
 pub const PlaybackState = struct {
     device: ?Device = null,
@@ -233,13 +232,22 @@ pub const Search = struct {
 };
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
-pub fn getPlaybackState(client: *Client) !std.json.Parsed(PlaybackState) {
+pub fn getPlaybackState(client: *Client) !PlaybackState {
     return client.sendRequest(PlaybackState, .GET, api_url ++ "/me/player", null);
 }
 
+pub fn getPlaybackStateOwned(client: *Client, arena: std.mem.Allocator) !PlaybackState {
+    return client.sendRequestOwned(PlaybackState, .GET, api_url ++ "/me/player", null, arena);
+}
+
 /// https://developer.spotify.com/documentation/web-api/reference/get-a-users-available-devices
-pub fn getDevices(client: *Client) !std.json.Parsed(Devices) {
-    return client.sendRequest(Devices, .GET, api_url ++ "/me/player/devices", null);
+pub fn getDevices(client: *Client) !Devices {
+    return (try client.sendRequest(
+        struct { devices: Devices = &[_]Device{} },
+        .GET,
+        api_url ++ "/me/player/devices",
+        null,
+    )).devices;
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/search
@@ -249,31 +257,14 @@ pub fn search(
     types: []const u8, // comma separated list of types
     limit: u64, // max num of results, 0-50 (default 20)
     offset: u64, // index of first result to return (default 0)
-) !std.json.Parsed(Search) {
-    const url = try std.fmt.allocPrint(
-        client.allocator,
-        api_url ++ "/search?q={query}&type={s}&limit={d}&offset={d}",
-        .{ std.Uri.Component{ .raw = query }, types, limit, offset },
-    );
-    defer client.allocator.free(url);
-    return client.sendRequest(Search, .GET, url, null);
-}
-
-pub fn searchLeaky(
-    client: *Client,
-    query: []const u8, // will be sanitized
-    types: []const u8, // comma separated list of types
-    limit: u64, // max num of results, 0-50 (default 20)
-    offset: u64, // index of first result to return (default 0)
-    arena: std.mem.Allocator,
 ) !Search {
-    const url = try std.fmt.allocPrint(
-        client.allocator,
+    var buf: [4096]u8 = undefined;
+    const url = try std.fmt.bufPrint(
+        &buf,
         api_url ++ "/search?q={query}&type={s}&limit={d}&offset={d}",
         .{ std.Uri.Component{ .raw = query }, types, limit, offset },
     );
-    defer client.allocator.free(url);
-    return client.sendRequestLeaky(Search, .GET, url, null, arena);
+    return client.sendRequest(Search, .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
@@ -285,15 +276,21 @@ pub fn startPlayback(
     },
     device_id: ?[]const u8,
 ) !void {
-    const body = if (data) |uri|
-        try std.json.stringifyAlloc(client.allocator, uri, .{})
-    else
-        try client.allocator.dupe(u8, "{}");
-    defer client.allocator.free(body);
+    var buf: [4096]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(buf[0..]);
+    const body = blk: {
+        if (data) |uri| {
+            try std.json.stringify(uri, .{}, fbs.writer());
+            break :blk fbs.getWritten();
+        } else {
+            break :blk "{}";
+        }
+    };
 
     if (device_id) |id| {
-        var buf: [128]u8 = undefined;
-        const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/play?device_id={s}", .{id});
+        fbs = std.io.fixedBufferStream(buf[body.len..]);
+        try fbs.writer().print(api_url ++ "/me/player/play?device_id={s}", .{id});
+        const url = fbs.getWritten();
         return client.sendRequest(void, .PUT, url, body);
     } else {
         return client.sendRequest(void, .PUT, api_url ++ "/me/player/play", body);
@@ -344,7 +341,7 @@ pub fn toggleShuffle(client: *Client, state: bool) !void {
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
-pub fn getUserPlaylists(client: *Client, limit: u64, offset: u64) !std.json.Parsed(Playlists) {
+pub fn getUserPlaylists(client: *Client, limit: u64, offset: u64) !Playlists {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
@@ -355,7 +352,7 @@ pub fn getUserPlaylists(client: *Client, limit: u64, offset: u64) !std.json.Pars
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
-pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !std.json.Parsed(Tracks(true)) {
+pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !Tracks(true) {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
@@ -366,7 +363,7 @@ pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !std.json.Parsed(
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-albums
-pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !std.json.Parsed(Albums(true)) {
+pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !Albums(true) {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
@@ -377,54 +374,44 @@ pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !std.json.Parsed(
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-followed
-pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !std.json.Parsed(Artists) {
+pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !Artists {
     var buf: [128]u8 = undefined;
     const url = try if (after) |a| std.fmt.bufPrint(
         &buf,
         api_url ++ "/me/following?type=artist&limit={d}&after={s}",
         .{ limit, a },
     ) else std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&limit={d}", .{limit});
-    const parsed = try client.sendRequest(struct { artists: Artists = .{} }, .GET, url, null);
-    return .{
-        .value = parsed.value.artists,
-        .arena = parsed.arena,
-    };
+    return (try client.sendRequest(struct { artists: Artists = .{} }, .GET, url, null)).artists;
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/save-tracks-user
 pub fn saveTracks(client: *Client, ids: []const u8) !void {
-    const url = try std.fmt.allocPrint(client.allocator, api_url ++ "/me/tracks?ids={s}", .{ids});
-    defer client.allocator.free(url);
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/tracks?ids={s}", .{ids});
     return client.sendRequest(void, .PUT, url, "");
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user
 pub fn removeTracks(client: *Client, ids: []const u8) !void {
-    const url = try std.fmt.allocPrint(client.allocator, api_url ++ "/me/tracks?ids={s}", .{ids});
-    defer client.allocator.free(url);
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/tracks?ids={s}", .{ids});
     return client.sendRequest(void, .DELETE, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-an-artist
-pub fn getArtistLeaky(client: *Client, id: []const u8, arena: std.mem.Allocator) !Artist {
-    const url = try std.fmt.allocPrint(client.allocator, api_url ++ "/artists/{s}", .{id});
-    defer client.allocator.free(url);
-    return client.sendRequestLeaky(Artist, .GET, url, null, arena);
+pub fn getArtist(client: *Client, id: []const u8) !Artist {
+    var buf: [256]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/artists/{s}", .{id});
+    return client.sendRequest(Artist, .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-an-albums-tracks
-pub fn getAlbumTracksLeaky(
-    client: *Client,
-    id: []const u8,
-    limit: usize,
-    offset: usize,
-    arena: std.mem.Allocator,
-) !Tracks(false) {
-    const url = try std.fmt.allocPrint(
-        client.allocator,
+pub fn getAlbumTracks(client: *Client, id: []const u8, limit: usize, offset: usize) !Tracks(false) {
+    var buf: [256]u8 = undefined;
+    const url = try std.fmt.bufPrint(
+        &buf,
         api_url ++ "/albums/{s}/tracks?limit={d}&offset={d}",
         .{ id, limit, offset },
     );
-    defer client.allocator.free(url);
-    return client.sendRequestLeaky(Tracks(false), .GET, url, null, arena);
+    return client.sendRequest(Tracks(false), .GET, url, null);
 }

@@ -13,16 +13,12 @@ pub fn exec(client: *api.Client) !void {
         error.NotPlaying => std.process.exit(1),
         else => return err,
     };
-    defer playback_state.deinit();
 
-    if (playback_state.value.is_playing) {
+    if (playback_state.is_playing) {
         std.log.info("Pausing playback", .{});
         try api.pausePlayback(client);
     } else {
         std.log.info("Resuming playback", .{});
-        api.startPlayback(client, null, null) catch |err| switch (err) {
-            error.NoActiveDevice => std.process.exit(1),
-            else => return err,
-        };
+        try api.startPlayback(client, null, null);
     }
 }

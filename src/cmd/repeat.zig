@@ -26,7 +26,6 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             error.NotPlaying => std.process.exit(1),
             else => return err,
         };
-        defer playback_state.deinit();
-        std.log.info("Repeat mode is currently set to {s}", .{playback_state.value.repeat_state});
+        std.log.info("Repeat mode is currently set to {s}", .{playback_state.repeat_state});
     }
 }

@@ -30,10 +30,9 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             error.NotPlaying => std.process.exit(1),
             else => return err,
         };
-        defer playback_state.deinit();
 
-        if (playback_state.value.item) |track| {
-            const progress_ms = playback_state.value.progress_ms;
+        if (playback_state.item) |track| {
+            const progress_ms = playback_state.progress_ms;
             const progress_min = progress_ms / std.time.ms_per_min;
             const progress_s = (progress_ms / std.time.ms_per_s) % std.time.s_per_min;
 
@@ -47,7 +46,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             );
         } else {
             std.log.warn("No track is currently playing", .{});
-            return;
+            std.process.exit(1);
         }
     }
 }

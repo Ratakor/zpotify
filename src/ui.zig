@@ -29,7 +29,12 @@ pub fn Table(
 
         const Self = @This();
 
-        pub fn draw(self: Self, rc: *spoon.Term.RenderContext, first_row: usize, selected_row: usize,) !void {
+        pub fn draw(
+            self: Self,
+            rc: *spoon.Term.RenderContext,
+            first_row: usize,
+            selected_row: usize,
+        ) !void {
             try Self.drawHeader(rc, first_row);
             try self.drawEntries(rc, first_row + 2, selected_row + 2);
         }
@@ -54,7 +59,12 @@ pub fn Table(
             try rpw.finish();
         }
 
-        fn drawEntries(self: Self, rc: *spoon.Term.RenderContext, first_row: usize, selected_row: usize,) !void {
+        fn drawEntries(
+            self: Self,
+            rc: *spoon.Term.RenderContext,
+            first_row: usize,
+            selected_row: usize,
+        ) !void {
             for (self.items, first_row..) |item, row| {
                 try rc.moveCursorTo(row, 0);
                 var rpw = rc.restrictedPaddingWriter(term.width);

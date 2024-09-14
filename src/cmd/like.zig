@@ -13,13 +13,12 @@ pub fn exec(client: *api.Client) !void {
         error.NotPlaying => std.process.exit(1),
         else => return err,
     };
-    defer playback_state.deinit();
 
-    if (playback_state.value.item) |track| {
+    if (playback_state.item) |track| {
         std.log.info("Adding '{s}' to your liked songs", .{track.name});
         try api.saveTracks(client, track.id);
     } else {
         std.log.warn("No track is currently playing", .{});
-        return;
+        std.process.exit(1);
     }
 }

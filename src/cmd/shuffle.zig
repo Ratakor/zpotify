@@ -26,8 +26,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
                 error.NotPlaying => std.process.exit(1),
                 else => return err,
             };
-            defer playback_state.deinit();
-            break :blk !playback_state.value.shuffle_state;
+            break :blk !playback_state.shuffle_state;
         }
     };
     if (state) {

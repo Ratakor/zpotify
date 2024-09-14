@@ -10,9 +10,8 @@ pub const usage =
 
 pub fn exec(client: *api.Client) !void {
     const devices = try api.getDevices(client);
-    defer devices.deinit();
 
-    if (devices.value.devices.len == 0) {
+    if (devices.len == 0) {
         std.log.err("No device found", .{});
         std.process.exit(1);
     }
@@ -21,7 +20,7 @@ pub fn exec(client: *api.Client) !void {
     var bw = std.io.bufferedWriter(stdout);
     const writer = bw.writer();
 
-    for (devices.value.devices, 0..) |device, i| {
+    for (devices, 0..) |device, i| {
         if (i != 0) {
             try writer.writeAll("\n");
         }

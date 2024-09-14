@@ -19,28 +19,28 @@ const Query = enum {
     album,
     artist,
 
-    fn Type(query: Query) type {
-        return std.json.Parsed(switch (query) {
+    fn Type(comptime query: Query) type {
+        return switch (query) {
             .track => api.Track,
             .playlist => api.Playlist,
             .album => api.Album,
             .artist => api.Artist,
-        });
+        };
     }
 
-    fn ParsedType(query: Query) type {
-        return std.json.Parsed(switch (query) {
+    fn ListType(comptime query: Query) type {
+        return switch (query) {
             .track => api.Tracks(true),
             .playlist => api.Playlists,
             .album => api.Albums(true),
             .artist => api.Artists,
-        });
+        };
     }
 };
 
 pub fn exec(
     client: *api.Client,
-    allocator: std.mem.Allocator,
+    child_allocator: std.mem.Allocator,
     arg: ?[]const u8,
 ) !void {
     const query = if (arg) |value| blk: {
@@ -58,46 +58,46 @@ pub fn exec(
         return;
     };
 
+    var arena = std.heap.ArenaAllocator.init(child_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
     switch (query) {
         .track => {
             const track = try getItemFromMenu(.track, client, allocator);
-            defer track.deinit();
-            try startPlayback(.track, client, allocator, track.value.uri);
+            try startPlayback(.track, client, allocator, track.uri);
             std.log.info("Playing track '{s}' from '{s}' by {s}", .{
-                track.value.name,
-                track.value.album.name,
-                track.value.artists[0].name,
+                track.name,
+                track.album.name,
+                track.artists[0].name,
             });
         },
         .playlist => {
             const playlist = try getItemFromMenu(.playlist, client, allocator);
-            defer playlist.deinit();
-            try startPlayback(.playlist, client, allocator, playlist.value.uri);
+            try startPlayback(.playlist, client, allocator, playlist.uri);
             std.log.info("Playing playlist '{s}' by {?s}", .{
-                playlist.value.name,
-                playlist.value.owner.display_name,
+                playlist.name,
+                playlist.owner.display_name,
             });
         },
         .album => {
             const album = try getItemFromMenu(.album, client, allocator);
-            defer album.deinit();
-            try startPlayback(.album, client, allocator, album.value.uri);
+            try startPlayback(.album, client, allocator, album.uri);
             std.log.info("Playing album '{s}' by {s}", .{
-                album.value.name,
-                album.value.artists[0].name,
+                album.name,
+                album.artists[0].name,
             });
         },
         .artist => {
             const artist = try getItemFromMenu(.artist, client, allocator);
-            defer artist.deinit();
-            try startPlayback(.artist, client, allocator, artist.value.uri);
-            std.log.info("Playing popular songs by {s}", .{artist.value.name});
+            try startPlayback(.artist, client, allocator, artist.uri);
+            std.log.info("Playing popular songs by {s}", .{artist.name});
         },
     }
 }
 
 fn startPlayback(
-    comptime query: Query,
+    query: Query,
     client: *api.Client,
     allocator: std.mem.Allocator,
     uri: []const u8,
@@ -117,23 +117,21 @@ fn startPlayback(
     }
 
     const devices = try api.getDevices(client);
-    defer devices.deinit();
-
-    if (devices.value.devices.len == 0) {
+    if (devices.len == 0) {
         std.log.err("No device found", .{});
         std.process.exit(1);
     }
 
     const id = blk: {
-        if (devices.value.devices.len == 1) {
-            break :blk devices.value.devices[0].id.?;
+        if (devices.len == 1) {
+            break :blk devices[0].id.?;
         }
 
         const dmenu_cmd = std.posix.getenv("DMENU") orelse "dmenu -i";
-        const result = try spawnMenu(allocator, dmenu_cmd, devices.value.devices);
+        const result = try spawnMenu(allocator, dmenu_cmd, devices);
         defer allocator.free(result);
 
-        for (devices.value.devices) |device| {
+        for (devices) |device| {
             if (std.mem.eql(u8, device.name, result)) {
                 break :blk device.id.?;
             }
@@ -159,24 +157,14 @@ fn startPlayback(
 fn getItemFromMenu(
     comptime query: Query,
     client: *api.Client,
-    allocator: std.mem.Allocator,
+    allocator: std.mem.Allocator, // arena allocator
 ) !query.Type() {
     const dmenu_cmd = std.posix.getenv("DMENU") orelse "dmenu -i";
 
-    const List = std.DoublyLinkedList(query.ParsedType());
+    const List = std.DoublyLinkedList(query.ListType());
     var list: List = .{};
-    errdefer {
-        var node = list.first;
-        while (node) |n| {
-            node = n.next;
-            n.data.deinit();
-            allocator.destroy(n);
-        }
-    }
-
     list.prepend(blk: {
         const node = try allocator.create(List.Node);
-        errdefer allocator.destroy(node);
         node.* = .{ .data = try switch (query) {
             .track => api.getUserTracks(client, limit, 0),
             .playlist => api.getUserPlaylists(client, limit, 0),
@@ -188,7 +176,7 @@ fn getItemFromMenu(
     var current = list.first.?;
 
     while (true) {
-        const result = try spawnMenu(allocator, dmenu_cmd, current.data.value.items);
+        const result = try spawnMenu(allocator, dmenu_cmd, current.data.items);
         defer allocator.free(result);
 
         if (std.mem.eql(u8, "previous", result)) {
@@ -196,18 +184,16 @@ fn getItemFromMenu(
         } else if (std.mem.eql(u8, "next", result)) {
             current = current.next orelse blk: {
                 if (query == .artist) {
-                    if (current.data.value.cursors.after) |after| {
+                    if (current.data.cursors.after) |after| {
                         const node = try allocator.create(List.Node);
-                        errdefer allocator.destroy(node);
                         node.* = .{ .data = try api.getUserArtists(client, limit, after) };
                         list.insertAfter(current, node);
                         break :blk node;
                     }
                 } else {
-                    if (current.data.value.next) |_| {
-                        const offset = current.data.value.offset + limit;
+                    if (current.data.next) |_| {
+                        const offset = current.data.offset + limit;
                         const node = try allocator.create(List.Node);
-                        errdefer allocator.destroy(node);
                         node.* = .{ .data = try switch (query) {
                             .track => api.getUserTracks(client, limit, offset),
                             .playlist => api.getUserPlaylists(client, limit, offset),
@@ -221,7 +207,7 @@ fn getItemFromMenu(
                 break :blk list.first.?;
             };
         } else {
-            for (current.data.value.items) |_item| {
+            for (current.data.items) |_item| {
                 const item = switch (query) {
                     .track => _item.track,
                     .playlist => _item,
@@ -229,20 +215,7 @@ fn getItemFromMenu(
                     .artist => _item,
                 };
                 if (std.mem.eql(u8, item.name, result)) {
-                    // do not try to be smarter and don't touch this part
-                    const res = .{
-                        .value = item,
-                        .arena = current.data.arena,
-                    };
-                    var node = list.first;
-                    while (node) |n| {
-                        node = n.next;
-                        if (n != current) {
-                            n.data.deinit();
-                        }
-                        allocator.destroy(n);
-                    }
-                    return res;
+                    return item;
                 }
             }
             std.log.err("Invalid selection: '{s}'", .{result});

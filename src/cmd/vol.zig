@@ -14,10 +14,9 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         error.NotPlaying => std.process.exit(1),
         else => return err,
     };
-    defer playback_state.deinit();
 
     var volume = blk: {
-        if (playback_state.value.device) |device| {
+        if (playback_state.device) |device| {
             if (device.supports_volume) {
                 break :blk device.volume_percent.?;
             } else {
@@ -54,7 +53,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         try api.setVolume(client, volume);
     } else {
         std.log.info("Volume for {s} is set to {d}%", .{
-            playback_state.value.device.?.name,
+            playback_state.device.?.name,
             volume,
         });
     }

@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addImport("spoon", spoon);
+    exe.linkLibC();
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -39,6 +40,7 @@ pub fn build(b: *std.Build) void {
         });
 
         rel_exe.root_module.addImport("spoon", spoon);
+        rel_exe.linkLibC();
         const install = b.addInstallArtifact(rel_exe, .{});
         install.dest_dir = .prefix;
         install.dest_sub_path = b.fmt("{s}-{s}", .{

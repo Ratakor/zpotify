@@ -27,24 +27,26 @@ pub const usage =
 
 const bar_len = 40;
 
-pub fn exec(client: *api.Client, allocator: std.mem.Allocator) !void {
+pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
     const stdout = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout);
     const writer = bw.writer();
+    var arena = std.heap.ArenaAllocator.init(child_allocator);
+    const allocator = arena.allocator();
 
     while (true) {
         defer std.time.sleep(std.time.ns_per_s);
         defer stdout.writeAll("\n") catch {};
 
-        const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
+        const info = api.getPlaybackStateOwned(client, allocator) catch |err| switch (err) {
             error.NotPlaying => continue,
             else => {
                 std.log.err("Failed to get playback state: {}\n", .{err});
                 continue;
             },
         };
-        defer playback_state.deinit();
-        const info = playback_state.value;
+        defer _ = arena.reset(.retain_capacity);
+
         const device = info.device orelse continue;
         const track = info.item orelse continue;
 
@@ -58,7 +60,6 @@ pub fn exec(client: *api.Client, allocator: std.mem.Allocator) !void {
             try builder.appendSlice(track.name);
             break :blk try std.mem.replaceOwned(u8, allocator, builder.items, "&", "&amp;");
         };
-        defer allocator.free(text);
 
         const tooltip = blk: {
             var builder = std.ArrayList(u8).init(allocator);
@@ -88,7 +89,6 @@ pub fn exec(client: *api.Client, allocator: std.mem.Allocator) !void {
             try builder.appendSlice(info.repeat_state);
             break :blk try std.mem.replaceOwned(u8, allocator, builder.items, "&", "&amp;");
         };
-        defer allocator.free(tooltip);
 
         try std.json.stringify(.{ .text = text, .tooltip = tooltip }, .{}, writer);
         try bw.flush();
