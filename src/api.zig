@@ -16,7 +16,7 @@ pub const scopes = [_][]const u8{
 };
 
 pub const Track = struct {
-    album: Album,
+    album: Album = .{},
     artists: []const SimplifiedArtist,
     available_markets: []const []const u8 = &[_][]const u8{},
     disc_number: u64 = 0,
@@ -259,6 +259,23 @@ pub fn search(
     return client.sendRequest(Search, .GET, url, null);
 }
 
+pub fn searchLeaky(
+    client: *Client,
+    query: []const u8, // will be sanitized
+    types: []const u8, // comma separated list of types
+    limit: u64, // max num of results, 0-50 (default 20)
+    offset: u64, // index of first result to return (default 0)
+    arena: std.mem.Allocator,
+) !Search {
+    const url = try std.fmt.allocPrint(
+        client.allocator,
+        api_url ++ "/search?q={query}&type={s}&limit={d}&offset={d}",
+        .{ std.Uri.Component{ .raw = query }, types, limit, offset },
+    );
+    defer client.allocator.free(url);
+    return client.sendRequestLeaky(Search, .GET, url, null, arena);
+}
+
 /// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
 pub fn startPlayback(
     client: *Client,
@@ -386,4 +403,28 @@ pub fn removeTracks(client: *Client, ids: []const u8) !void {
     const url = try std.fmt.allocPrint(client.allocator, api_url ++ "/me/tracks?ids={s}", .{ids});
     defer client.allocator.free(url);
     return client.sendRequest(void, .DELETE, url, null);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/get-an-artist
+pub fn getArtistLeaky(client: *Client, id: []const u8, arena: std.mem.Allocator) !Artist {
+    const url = try std.fmt.allocPrint(client.allocator, api_url ++ "/artists/{s}", .{id});
+    defer client.allocator.free(url);
+    return client.sendRequestLeaky(Artist, .GET, url, null, arena);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/get-an-albums-tracks
+pub fn getAlbumTracksLeaky(
+    client: *Client,
+    id: []const u8,
+    limit: usize,
+    offset: usize,
+    arena: std.mem.Allocator,
+) !Tracks(false) {
+    const url = try std.fmt.allocPrint(
+        client.allocator,
+        api_url ++ "/albums/{s}/tracks?limit={d}&offset={d}",
+        .{ id, limit, offset },
+    );
+    defer client.allocator.free(url);
+    return client.sendRequestLeaky(Tracks(false), .GET, url, null, arena);
 }

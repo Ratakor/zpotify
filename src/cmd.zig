@@ -7,6 +7,7 @@
 
 pub const print = @import("cmd/print.zig");
 pub const play = @import("cmd/play.zig");
+pub const search = @import("cmd/search.zig");
 pub const pause = @import("cmd/pause.zig");
 pub const prev = @import("cmd/prev.zig");
 pub const next = @import("cmd/next.zig");

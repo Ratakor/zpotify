@@ -71,6 +71,7 @@ pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
     if (args.next()) |arg2| {
         try format(writer, arg2, playback_state.value);
         while (args.next()) |arg| {
+            try writer.writeAll(" ");
             try format(writer, arg, playback_state.value);
         }
     } else {

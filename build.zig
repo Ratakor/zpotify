@@ -4,12 +4,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const spoon = b.dependency("zig-spoon", .{}).module("spoon");
+
     const exe = b.addExecutable(.{
         .name = "zpotify",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+    exe.root_module.addImport("spoon", spoon);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -35,6 +38,7 @@ pub fn build(b: *std.Build) void {
             .strip = true,
         });
 
+        rel_exe.root_module.addImport("spoon", spoon);
         const install = b.addInstallArtifact(rel_exe, .{});
         install.dest_dir = .prefix;
         install.dest_sub_path = b.fmt("{s}-{s}", .{

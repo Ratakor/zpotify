@@ -2,7 +2,12 @@
     .name = "zpotify",
     .version = "0.2.2",
     .minimum_zig_version = "0.13.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .@"zig-spoon" = .{
+            .url = "https://git.sr.ht/~leon_plickat/zig-spoon/archive/ecaa2f9cf6c8680fa75adc4b5b791d4d57bd246a.tar.gz",
+            .hash = "12202727aaaf0e742d4945be55af1ace8b25902095e0c1b0a24b70cc80a81b7ac518",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",
