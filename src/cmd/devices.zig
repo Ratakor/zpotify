@@ -8,7 +8,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(client: *api.Client) !void {
+pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     const devices = try api.getDevices(client);
 
     if (devices.len == 0) {
@@ -19,6 +19,17 @@ pub fn exec(client: *api.Client) !void {
     const stdout = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout);
     const writer = bw.writer();
+
+    if (arg) |a| {
+        // used on auto-completion for `transfer`
+        if (std.mem.eql(u8, a, "_name")) {
+            for (devices) |device| {
+                try writer.print("'{s}' ", .{device.name});
+            }
+            try bw.flush();
+            return;
+        }
+    }
 
     for (devices, 0..) |device, i| {
         if (i != 0) {

@@ -16,6 +16,7 @@ pub const usage =
     \\
     \\Commands:
     \\  print      | Display current track info in a specific format
+    \\  search     | Search a track, playlist, album, or artist with a TUI
     \\  play       | Play a track, playlist, album, or artist from your library
     \\  pause      | Toggle pause state
     \\  prev       | Skip to previous track
@@ -26,6 +27,7 @@ pub const usage =
     \\  vol        | Get/Set volume or increase/decrease volume by 10%
     \\  like       | Add the current track to your liked songs
     \\  devices    | List all available devices
+    \\  transfer   | Transfer playback to another device
     \\  waybar     | Display infos about the current playback for a waybar module
     \\  logout     | Remove the stored credentials from the config file
     \\  help       | Display information about a command
@@ -125,7 +127,9 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "like")) {
         return cmd.like.exec(&client);
     } else if (std.mem.eql(u8, command, "devices")) {
-        return cmd.devices.exec(&client);
+        return cmd.devices.exec(&client, args.next());
+    } else if (std.mem.eql(u8, command, "transfer")) {
+        return cmd.transfer.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "waybar")) {
         return cmd.waybar.exec(&client, std.heap.raw_c_allocator);
     } else {

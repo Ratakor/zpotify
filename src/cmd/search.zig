@@ -104,11 +104,13 @@ fn loop() !void {
             } else if (in.eqlDescription("arrow-up") or in.eqlDescription("k") or
                 (in.content == .mouse and in.content.mouse.button == .scroll_up))
             {
-                current_table.selected -|= 1;
-                if (current_table.selected < current_table.start) {
-                    current_table.start -|= 1;
+                if (current_table.selected > 0) {
+                    current_table.selected -= 1;
+                    if (current_table.selected < current_table.start) {
+                        current_table.start -= 1;
+                    }
+                    try render();
                 }
-                try render();
             } else if (in.eqlDescription("arrow-right") or in.eqlDescription("l")) {
                 current_table = try current_table.nextTable() orelse {
                     // current_table is a track -> play it
@@ -207,6 +209,10 @@ fn render() !void {
     try drawHeader(&rc);
     try current_table.draw(&rc, 1);
     try drawFooter(&rc);
+
+    // if (current_table.imageUrl()) |url| {
+    //     try ui.drawImage(&rc, url, 0, 0);
+    // }
 }
 
 fn drawHeader(rc: *spoon.Term.RenderContext) !void {
@@ -237,7 +243,9 @@ fn drawFooter(rc: *spoon.Term.RenderContext) !void {
 
 fn handleSigWinch(_: c_int) callconv(.C) void {
     ui.term.fetchSize() catch {};
-    render() catch {};
+    if (!ui.term.currently_rendering) {
+        render() catch {};
+    }
 }
 
 const Table = struct {
@@ -499,7 +507,14 @@ const Table = struct {
             .albums => |list| list.items[self.selected].images,
             .playlists => |list| list.items[self.selected].images,
         };
-        return if (images.len == 0) null else images[0].url;
+        return switch (images.len) {
+            0 => null,
+            1 => images[0].url,
+            else => blk: {
+                // TODO: pick the best one based on the terminal size
+                break :blk images[1].url;
+            },
+        };
     }
 
     pub fn len(self: Table) usize {

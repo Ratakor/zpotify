@@ -8,9 +8,10 @@ const c = @cImport({
 });
 
 pub var term: spoon.Term = undefined;
+var err_mgr: c.jpeg_error_mgr = undefined; // TODO: custom setup
 pub var cinfo: c.jpeg_decompress_struct = undefined;
-pub var chafa_symbol_map: *c.ChafaSymbolMap = undefined;
 pub var chafa_config: *c.ChafaCanvasConfig = undefined;
+var use_sixels = false;
 
 pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
     try term.init(.{});
@@ -24,16 +25,20 @@ pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
     try term.uncook(.{ .request_mouse_tracking = true });
     try term.fetchSize();
 
-    chafa_symbol_map = c.chafa_symbol_map_new().?;
-    c.chafa_symbol_map_add_by_tags(chafa_symbol_map, c.CHAFA_SYMBOL_TAG_ALL);
+    cinfo.err = c.jpeg_std_error(&err_mgr);
+
+    const symbol_map = c.chafa_symbol_map_new().?;
+    defer c.chafa_symbol_map_unref(symbol_map);
+    // TODO: experiment with different symbol tags
+    c.chafa_symbol_map_add_by_tags(symbol_map, c.CHAFA_SYMBOL_TAG_HALF);
     chafa_config = c.chafa_canvas_config_new().?;
-    c.chafa_canvas_config_set_geometry(chafa_config, 15, 15); // TODO + also update it based on term size (with sigwinch)
     try detectTerminal(chafa_config);
+    // c.chafa_canvas_config_set_geometry(chafa_config, 15, 15); // TODO + also update it based on term size (with sigwinch)
+    c.chafa_canvas_config_set_symbol_map(chafa_config, symbol_map);
 }
 
 pub fn deinit() void {
     c.chafa_canvas_config_unref(chafa_config);
-    c.chafa_symbol_map_unref(chafa_symbol_map);
     term.deinit() catch unreachable;
 }
 
@@ -52,24 +57,30 @@ pub const Image = struct {
     }
 };
 
-fn drawImage(rc: *spoon.Term.RenderContext) !void {
-    // const url = current_table.imageUrl() orelse return;
-    const url = "";
-
+pub fn drawImage(
+    rc: *spoon.Term.RenderContext,
+    url: []const u8,
+    start_x: usize,
+    y: usize,
+) !void {
     // TODO: allocator
     var image = try fetchAlbumImage(std.heap.c_allocator, url);
     defer image.deinit();
 
-    const symbol_map = c.chafa_symbol_map_new().?;
-    defer c.chafa_symbol_map_unref(symbol_map);
-    c.chafa_symbol_map_add_by_tags(symbol_map, c.CHAFA_SYMBOL_TAG_ALL);
-    const config = c.chafa_canvas_config_new().?;
-    defer c.chafa_canvas_config_unref(config);
-    c.chafa_canvas_config_set_geometry(config, 15, 15); // TODO: size based on terminal size
-    try detectTerminal(config);
-    c.chafa_canvas_config_set_symbol_map(config, symbol_map);
+    var w: c.gint = @intCast(term.width - start_x);
+    var h: c.gint = @intCast(term.height - y);
+    c.chafa_calc_canvas_geometry(
+        @intCast(image.width),
+        @intCast(image.height),
+        &w,
+        &h,
+        if (use_sixels) 1 else 0.5,
+        @intFromBool(false),
+        @intFromBool(false),
+    );
+    c.chafa_canvas_config_set_geometry(chafa_config, w, h);
 
-    const canvas = c.chafa_canvas_new(config).?;
+    const canvas = c.chafa_canvas_new(chafa_config).?;
     defer c.chafa_canvas_unref(canvas);
 
     c.chafa_canvas_draw_all_pixels(
@@ -80,39 +91,63 @@ fn drawImage(rc: *spoon.Term.RenderContext) !void {
         @intCast(image.height),
         @intCast(image.width * Image.channel_count),
     );
-    const gs = c.chafa_canvas_build_ansi(canvas);
+    const gs = c.chafa_canvas_print(canvas, getTermInfo());
     defer _ = c.g_string_free(gs, @intFromBool(true));
 
     var iter = std.mem.splitScalar(u8, gs.*.str[0..gs.*.len], '\n');
-    var i: usize = 0;
-    while (iter.next()) |line| : (i += 1) {
-        try rc.moveCursorTo(i, 0);
+    var x: usize = start_x;
+    while (iter.next()) |line| : (x += 1) {
+        try rc.moveCursorTo(x, y);
         try rc.buffer.writer().writeAll(line);
+    }
+}
+
+fn getCachePath(allocator: std.mem.Allocator, id: []const u8) ![]const u8 {
+    if (std.posix.getenv("XDG_CACHE_HOME")) |xdg_cache| {
+        return std.fmt.allocPrint(allocator, "{s}/zpotify/{s}.jpeg", .{ xdg_cache, id });
+    } else if (std.posix.getenv("HOME")) |home| {
+        return std.fmt.allocPrint(allocator, "{s}/.cache/zpotify/{s}.jpeg", .{ home, id });
+    } else {
+        return error.EnvironmentVariableNotFound;
     }
 }
 
 // do not use with an arena
 pub fn fetchAlbumImage(allocator: std.mem.Allocator, url: []const u8) !Image {
-    var client: std.http.Client = .{ .allocator = allocator };
-    defer client.deinit();
+    const cwd = std.fs.cwd();
+    const id = url[std.mem.lastIndexOfScalar(u8, url, '/').? + 1 ..];
+    const cache_path = try getCachePath(allocator, id);
+    defer allocator.free(cache_path);
+    const raw_image = if (cwd.openFile(cache_path, .{})) |file| blk: {
+        defer file.close();
+        break :blk try file.readToEndAlloc(allocator, 1024 * 1024);
+    } else |err| blk: {
+        if (err != error.FileNotFound) {
+            return err;
+        }
+        try cwd.makePath(cache_path[0..std.mem.lastIndexOfScalar(u8, cache_path, '/').?]);
+        const file = try cwd.createFile(cache_path, .{});
+        defer file.close();
 
-    var response = std.ArrayList(u8).init(allocator);
-    defer response.deinit();
+        var client: std.http.Client = .{ .allocator = allocator };
+        defer client.deinit();
+        var response = std.ArrayList(u8).init(allocator);
+        defer response.deinit();
+        const result = try client.fetch(.{
+            .method = .GET,
+            .location = .{ .url = url },
+            .response_storage = .{ .dynamic = &response },
+        });
+        std.debug.assert(result.status == .ok); // TODO
 
-    const result = try client.fetch(.{
-        .method = .GET,
-        .location = .{ .url = url },
-        .response_storage = .{ .dynamic = &response },
-    });
-    std.debug.assert(result.status == .ok); // TODO
-
-    // TODO
-    var err_mgr: c.jpeg_error_mgr = undefined;
-    cinfo.err = c.jpeg_std_error(&err_mgr);
+        try file.writeAll(response.items);
+        break :blk try response.toOwnedSlice();
+    };
+    defer allocator.free(raw_image);
 
     c.jpeg_create_decompress(&cinfo);
     defer c.jpeg_destroy_decompress(&cinfo);
-    c.jpeg_mem_src(&cinfo, response.items.ptr, response.items.len);
+    c.jpeg_mem_src(&cinfo, raw_image.ptr, raw_image.len);
     _ = c.jpeg_read_header(&cinfo, @intFromBool(true));
     _ = c.jpeg_start_decompress(&cinfo);
     defer _ = c.jpeg_finish_decompress(&cinfo);
@@ -140,10 +175,12 @@ pub fn fetchAlbumImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     };
 }
 
+fn getTermInfo() ?*c.ChafaTermInfo {
+    return c.chafa_term_db_detect(c.chafa_term_db_get_default(), std.c.environ);
+}
+
 fn detectTerminal(config: *c.ChafaCanvasConfig) !void {
-    const term_info = c.chafa_term_db_detect(c.chafa_term_db_get_default(), std.c.environ) orelse {
-        return error.TermInfoNotFound;
-    };
+    const term_info = getTermInfo() orelse return error.TermInfoNotFound;
 
     if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FGBG_DIRECT) != 0 and
         c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FG_DIRECT) != 0 and
@@ -160,6 +197,7 @@ fn detectTerminal(config: *c.ChafaCanvasConfig) !void {
         c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_END_SIXELS) != 0)
     {
         c.chafa_canvas_config_set_pixel_mode(config, c.CHAFA_PIXEL_MODE_SIXELS);
+        use_sixels = true;
     } else if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_BEGIN_ITERM2_IMAGE) != 0 and
         c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_END_ITERM2_IMAGE) != 0)
     {

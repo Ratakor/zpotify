@@ -162,14 +162,14 @@ pub fn Tracks(comptime kind: Kind) type {
             },
             .playlist => struct {
                 added_at: []const u8,
-                added_by: struct { // nullable on very old playlists
+                added_by: ?struct { // nullable on very old playlists
                     external_urls: ExternalUrls = .{},
                     followers: Followers = .{},
                     href: []const u8 = "",
                     id: []const u8 = "",
                     type: []const u8 = "user",
                     uri: []const u8 = "",
-                } = .{},
+                } = null,
                 is_local: bool = false,
                 track: Track = .{}, // can be an Episode
                 // primary_color: ?[]const u8 = null,
@@ -240,18 +240,19 @@ pub const PlaybackState = struct {
     device: ?Device = null,
     repeat_state: []const u8 = "off",
     shuffle_state: bool = false,
-    context: struct {
+    context: ?struct {
         type: []const u8 = "",
         href: []const u8 = "",
         external_urls: ExternalUrls = .{},
         uri: []const u8 = "",
-    } = .{},
+    } = null,
     timestamp: u64 = 0,
     progress_ms: u64 = 0,
     is_playing: bool = false,
     item: ?Track = null,
     currently_playing_type: []const u8 = "",
     // actions...
+    // smart_shuffle: ?bool = null,
 };
 
 pub const Search = struct {
@@ -330,6 +331,20 @@ pub fn startPlayback(
 /// https://developer.spotify.com/documentation/web-api/reference/pause-a-users-playback
 pub fn pausePlayback(client: *Client) !void {
     return client.sendRequest(void, .PUT, api_url ++ "/me/player/pause", "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/transfer-a-users-playback
+pub fn transferPlayback(client: *Client, device_id: []const u8) !void {
+    var buf: [128]u8 = undefined;
+    const body = try std.fmt.bufPrint(&buf, "{{\"device_ids\":[\"{s}\"]}}", .{device_id});
+    return client.sendRequest(void, .PUT, api_url ++ "/me/player", body);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/add-to-queue
+pub fn addToQueue(client: *Client, uri: []const u8) !void {
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/queue?uri={s}", .{uri});
+    return client.sendRequest(void, .POST, url, "");
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/skip-users-playback-to-next-track

@@ -15,7 +15,11 @@ pub fn exec(client: *api.Client) !void {
     };
 
     if (playback_state.item) |track| {
-        std.log.info("Adding '{s}' to your liked songs", .{track.name});
+        std.log.info("Adding '{s}' from '{s}' by {s} to your liked songs", .{
+            track.name,
+            track.album.name,
+            track.artists[0].name,
+        });
         try api.saveTracks(client, track.id);
     } else {
         std.log.warn("No track is currently playing", .{});

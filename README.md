@@ -31,6 +31,7 @@ Usage: zpotify [command] [options]
 
 Commands:
   print      | Display current track info in a specific format
+  search     | Search a track, playlist, album, or artist with a TUI
   play       | Play a track, playlist, album, or artist from your library
   pause      | Toggle pause state
   prev       | Skip to previous track
@@ -41,6 +42,7 @@ Commands:
   vol        | Get/Set volume or increase/decrease volume by 10%
   like       | Add the current track to your liked songs
   devices    | List all available devices
+  transfer   | Transfer playback to another device
   waybar     | Display infos about the current playback for a waybar module
   logout     | Remove the stored credentials from the config file
   help       | Display information about a command
@@ -82,5 +84,5 @@ Benchmark 2 (43 runs): ./run zpotify
 ```
 
 ## TODO
+- finish `search` and add it to _zpotify
 - add test coverage
-- add `search` with TUI like [baton](https://github.com/joshuathompson/baton)

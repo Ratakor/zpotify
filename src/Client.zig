@@ -1,5 +1,6 @@
 const std = @import("std");
 const api = @import("api.zig");
+const main = @import("main.zig");
 
 const Client = @This();
 
@@ -346,6 +347,11 @@ fn getToken(self: *Client, body: []const u8) !?[]const u8 {
             .{},
         )) |json| {
             std.log.err("{?s} ({s})", .{ json.error_description, json.@"error" });
+            if (std.mem.eql(u8, json.@"error", "invalid_grant")) {
+                std.log.info("Please try again and if the problem persists run `{s} logout`", .{
+                    main.progname,
+                });
+            }
         } else |err| {
             std.log.err("Failed to parse the error response: {}", .{err});
         }
