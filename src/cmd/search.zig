@@ -7,6 +7,7 @@ const cmd = @import("../cmd.zig");
 // this is allocation fest
 // TODO: add number in ui like in vim?
 // TODO: add a way to display errors e.g. no active device
+// TODO: add mouse support for clicking on a row
 
 pub const usage =
     \\Usage: {s} search [track|artist|album|playlist] [query]...
@@ -64,17 +65,9 @@ pub fn exec(
     });
     current_table = try Table.init(client, allocator, query, kind, title);
 
-    try ui.term.init(.{});
-    defer ui.term.deinit() catch {};
+    try ui.init(handleSigWinch);
+    defer ui.deinit();
 
-    try std.posix.sigaction(std.posix.SIG.WINCH, &std.posix.Sigaction{
-        .handler = .{ .handler = handleSigWinch },
-        .mask = std.posix.empty_sigset,
-        .flags = 0,
-    }, null);
-
-    try ui.term.uncook(.{});
-    try ui.term.fetchSize();
     try render();
     try loop();
 }
@@ -96,7 +89,9 @@ fn loop() !void {
         while (it.next()) |in| {
             if (in.eqlDescription("escape") or in.eqlDescription("q")) {
                 return;
-            } else if (in.eqlDescription("arrow-down") or in.eqlDescription("j")) {
+            } else if (in.eqlDescription("arrow-down") or in.eqlDescription("j") or
+                (in.content == .mouse and in.content.mouse.button == .scroll_down))
+            {
                 if (current_table.selected < current_table.len() - 1) {
                     current_table.selected += 1;
                     if (current_table.selected - current_table.start >= ui.term.height - 5) {
@@ -106,7 +101,9 @@ fn loop() !void {
                 } else if (try current_table.fetchNext()) {
                     try render();
                 }
-            } else if (in.eqlDescription("arrow-up") or in.eqlDescription("k")) {
+            } else if (in.eqlDescription("arrow-up") or in.eqlDescription("k") or
+                (in.content == .mouse and in.content.mouse.button == .scroll_up))
+            {
                 current_table.selected -|= 1;
                 if (current_table.selected < current_table.start) {
                     current_table.start -|= 1;
@@ -163,7 +160,12 @@ fn loop() !void {
                     else => return err,
                 };
             } else if (in.eqlDescription("s")) {
-                // TODO: save
+                try current_table.save(); // rename like command to save?
+                // TODO: notify user
+            } else if (in.eqlDescription("r")) {
+                // TODO: do it in 's'? (no)
+                // try current_table.remove(); // TODO: + add remove command
+                // TODO: notify user
             } else if (in.eqlDescription("-") or in.eqlDescription("_")) {
                 // try cmd.vol.exec(current_table.client, "down"); // TODO: display log correctly
             } else if (in.eqlDescription("+") or in.eqlDescription("=")) {
@@ -227,10 +229,9 @@ fn drawFooter(rc: *spoon.Term.RenderContext) !void {
     });
     try rpw.pad();
     try rc.moveCursorTo(ui.term.height - 1, 0);
-    // try rc.setAttribute(.{ .fg = .cyan, .reverse = true });
     try rc.setAttribute(.{ .fg = .none, .bg = .cyan });
     rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().writeAll("[q] Quit [h] Go back [j] Down [k] Up...");
+    try rpw.writer().writeAll("[q] Quit [h] Go back [j] Down [k] Up..."); // TODO
     try rpw.pad();
 }
 
@@ -480,6 +481,25 @@ const Table = struct {
                 try api.startPlayback(self.client, .{ .context_uri = uri }, null);
             },
         }
+    }
+
+    pub fn save(self: Table) !void {
+        switch (self.list) {
+            .tracks => |list| try api.saveTracks(self.client, list.items[self.selected].id),
+            .artists => |list| try api.followArtist(self.client, list.items[self.selected].id),
+            .albums => |list| try api.saveAlbums(self.client, list.items[self.selected].id),
+            .playlists => |list| try api.followPlaylist(self.client, list.items[self.selected].id),
+        }
+    }
+
+    pub fn imageUrl(self: Table) ?[]const u8 {
+        const images = switch (self.list) {
+            .tracks => |list| list.items[self.selected].album.images,
+            .artists => |list| list.items[self.selected].images,
+            .albums => |list| list.items[self.selected].images,
+            .playlists => |list| list.items[self.selected].images,
+        };
+        return if (images.len == 0) null else images[0].url;
     }
 
     pub fn len(self: Table) usize {
