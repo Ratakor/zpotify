@@ -3,27 +3,24 @@ zpotify is a CLI for controlling Spotify playback and much more!
 
 ## Installation
 
-### [AUR](https://aur.archlinux.org/packages/zpotify-bin)
+### [AUR](https://aur.archlinux.org/packages/zpotify)
 
+Using your favorite AUR helper or manually:
 ```
-git clone https://aur.archlinux.org/zpotify-bin.git
-cd zpotify-bin
+git clone https://aur.archlinux.org/zpotify
+cd zpotify
 makepkg -si
 ```
 
-### Manual Installation
-
-Grab one of the [release](https://github.com/Ratakor/zpotify/releases)
-according to your system. Zsh completions are available [here](_zpotify)!
-
 ### Building
 
-Requires zig 0.13.0.
+Requires zig 0.13.0, libjpeg and chafa.
 ```
-git clone https://github.com/ratakor/zpotify.git
+git clone https://github.com/ratakor/zpotify
 cd zpotify
-zig build -Doptimize=ReleaseSafe
+zig build -Doptimize=ReleaseFast
 ```
+Zsh completions are available [here](_zpotify)!
 
 ## Usage
 ```
@@ -85,4 +82,5 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 - finish `search` and add it to _zpotify
+- redo the perf analysis
 - add test coverage

@@ -75,9 +75,9 @@ pub fn exec(
         .playlist => {
             const playlist = try getItemFromMenu(.playlist, client, allocator);
             try startPlayback(.playlist, client, allocator, playlist.uri);
-            std.log.info("Playing playlist '{s}' by {?s}", .{
+            std.log.info("Playing playlist '{s}' by {s}", .{
                 playlist.name,
-                playlist.owner.display_name,
+                playlist.owner.display_name orelse playlist.owner.id,
             });
         },
         .album => {
@@ -210,9 +210,8 @@ fn getItemFromMenu(
             for (current.data.items) |_item| {
                 const item = switch (query) {
                     .track => _item.track,
-                    .playlist => _item,
                     .album => _item.album,
-                    .artist => _item,
+                    else => _item,
                 };
                 if (std.mem.eql(u8, item.name, result)) {
                     return item;
