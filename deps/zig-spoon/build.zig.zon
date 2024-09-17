@@ -1,0 +1,11 @@
+.{
+    .name = "zig-spoon",
+    .version = "0.1.0",
+    .dependencies = .{},
+    .paths = .{
+        "lib",
+        "import.zig",
+        "build.zig",
+        "build.zig.zon",
+    },
+}

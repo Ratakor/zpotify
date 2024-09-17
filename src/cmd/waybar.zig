@@ -18,9 +18,7 @@ pub const usage =
     \\    "exec": "zpotify waybar",
     \\    "return-type": "json",
     \\    "tooltip": true,
-    \\    "on-click": "zpotify prev",
-    \\    "on-click-middle": "zpotify pause",
-    \\    "on-click-right": "zpotify next"
+    \\    "on-click": "zpotify pause >/dev/null"
     \\}}
     \\
 ;
