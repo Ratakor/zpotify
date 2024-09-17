@@ -11,11 +11,10 @@ pub var term: spoon.Term = undefined;
 var err_mgr: c.jpeg_error_mgr = undefined; // TODO: custom setup
 pub var cinfo: c.jpeg_decompress_struct = undefined;
 pub var chafa_config: *c.ChafaCanvasConfig = undefined;
-var use_sixels = false;
 
 pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
     try term.init(.{});
-    errdefer term.deinit() catch unreachable;
+    errdefer term.deinit();
 
     try std.posix.sigaction(std.posix.SIG.WINCH, &std.posix.Sigaction{
         .handler = .{ .handler = sigWinchHandler },
@@ -29,17 +28,15 @@ pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
 
     const symbol_map = c.chafa_symbol_map_new().?;
     defer c.chafa_symbol_map_unref(symbol_map);
-    // TODO: experiment with different symbol tags
     c.chafa_symbol_map_add_by_tags(symbol_map, c.CHAFA_SYMBOL_TAG_HALF);
     chafa_config = c.chafa_canvas_config_new().?;
     try detectTerminal(chafa_config);
-    // c.chafa_canvas_config_set_geometry(chafa_config, 15, 15); // TODO + also update it based on term size (with sigwinch)
     c.chafa_canvas_config_set_symbol_map(chafa_config, symbol_map);
 }
 
 pub fn deinit() void {
     c.chafa_canvas_config_unref(chafa_config);
-    term.deinit() catch unreachable;
+    term.deinit();
 }
 
 pub const Image = struct {
@@ -54,51 +51,6 @@ pub const Image = struct {
         self.allocator.free(self.pixels);
     }
 };
-
-pub fn drawImage(
-    rc: *spoon.Term.RenderContext,
-    url: []const u8,
-    start_x: usize,
-    y: usize,
-) !void {
-    // TODO: allocator
-    var image = try fetchAlbumImage(std.heap.c_allocator, url);
-    defer image.deinit();
-
-    var w: c.gint = @intCast(term.width - start_x);
-    var h: c.gint = @intCast(term.height - y);
-    c.chafa_calc_canvas_geometry(
-        @intCast(image.width),
-        @intCast(image.height),
-        &w,
-        &h,
-        if (use_sixels) 1 else 0.5,
-        @intFromBool(false),
-        @intFromBool(false),
-    );
-    c.chafa_canvas_config_set_geometry(chafa_config, w, h);
-
-    const canvas = c.chafa_canvas_new(chafa_config).?;
-    defer c.chafa_canvas_unref(canvas);
-
-    c.chafa_canvas_draw_all_pixels(
-        canvas,
-        c.CHAFA_PIXEL_RGB8,
-        image.pixels.ptr,
-        @intCast(image.width),
-        @intCast(image.height),
-        @intCast(image.width * Image.channel_count),
-    );
-    const gs = c.chafa_canvas_print(canvas, getTermInfo());
-    defer _ = c.g_string_free(gs, @intFromBool(true));
-
-    var iter = std.mem.splitScalar(u8, gs.*.str[0..gs.*.len], '\n');
-    var x: usize = start_x;
-    while (iter.next()) |line| : (x += 1) {
-        try rc.moveCursorTo(x, y);
-        try rc.buffer.writer().writeAll(line);
-    }
-}
 
 fn getCachePath(allocator: std.mem.Allocator, id: []const u8) ![]const u8 {
     if (std.posix.getenv("XDG_CACHE_HOME")) |xdg_cache| {
@@ -150,7 +102,7 @@ pub fn fetchAlbumImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     _ = c.jpeg_start_decompress(&cinfo);
     defer _ = c.jpeg_finish_decompress(&cinfo);
 
-    if (cinfo.data_precision != 8 or cinfo.output_components != 3) {
+    if (cinfo.data_precision != 8 or cinfo.output_components != Image.channel_count) {
         return error.UnsupportedImageFormat;
     }
 
@@ -195,7 +147,6 @@ fn detectTerminal(config: *c.ChafaCanvasConfig) !void {
         c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_END_SIXELS) != 0)
     {
         c.chafa_canvas_config_set_pixel_mode(config, c.CHAFA_PIXEL_MODE_SIXELS);
-        use_sixels = true;
     } else if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_BEGIN_ITERM2_IMAGE) != 0 and
         c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_END_ITERM2_IMAGE) != 0)
     {
@@ -232,13 +183,13 @@ pub const Table = struct {
 
     pub fn init(
         client: *api.Client,
-        allocator: std.mem.Allocator,
+        arena_allocator: std.mem.Allocator, // TODO: move to gpa?
         kind: Kind,
         title: []const u8,
         query: []const u8,
         fetchFn: *const fn (*Table) anyerror!void,
     ) !*Table {
-        var table = try allocator.create(Table);
+        var table = try arena_allocator.create(Table);
         table.* = .{
             .list = switch (kind) {
                 .track => .{ .tracks = .{} },
@@ -247,7 +198,7 @@ pub const Table = struct {
                 .playlist => .{ .playlists = .{} },
             },
             .client = client,
-            .allocator = allocator,
+            .allocator = arena_allocator,
             .query = query,
             .fetchFn = fetchFn,
             .title = title,
@@ -305,11 +256,36 @@ pub const Table = struct {
         const end = @min(self.len(), self.start + term.height - 5);
         const selected_row = first_row + self.selected - self.start;
 
+        // TODO: find a way to use an inline else
         switch (self.list) {
-            .tracks => |list| try drawTracks(list.items[start..end], rc, first_row, selected_row),
-            .artists => |list| try drawArtists(list.items[start..end], rc, first_row, selected_row),
-            .albums => |list| try drawAlbums(list.items[start..end], rc, first_row, selected_row),
-            .playlists => |list| try drawPlaylists(list.items[start..end], rc, first_row, selected_row),
+            .tracks => |list| try drawTracks(
+                list.items[start..end],
+                self.imageUrl(),
+                rc,
+                first_row,
+                selected_row,
+            ),
+            .artists => |list| try drawArtists(
+                list.items[start..end],
+                self.imageUrl(),
+                rc,
+                first_row,
+                selected_row,
+            ),
+            .albums => |list| try drawAlbums(
+                list.items[start..end],
+                self.imageUrl(),
+                rc,
+                first_row,
+                selected_row,
+            ),
+            .playlists => |list| try drawPlaylists(
+                list.items[start..end],
+                self.imageUrl(),
+                rc,
+                first_row,
+                selected_row,
+            ),
         }
     }
 
@@ -445,7 +421,7 @@ pub const Table = struct {
             item: T,
             writer: anytype,
         ) anyerror!void,
-    ) fn ([]const T, *spoon.Term.RenderContext, usize, usize) anyerror!void {
+    ) fn ([]const T, ?[]const u8, *spoon.Term.RenderContext, usize, usize) anyerror!void {
         comptime {
             var size = 0;
             for (columns) |col| {
@@ -455,64 +431,137 @@ pub const Table = struct {
         }
 
         return struct {
+            // TODO: move back to separate functions (again)
             fn draw(
                 items: []const T,
+                image_url: ?[]const u8,
                 rc: *spoon.Term.RenderContext,
                 first_row: usize,
                 selected_row: usize,
             ) !void {
-                try drawHeader(rc, first_row);
-                try drawEntries(items, rc, first_row + 2, selected_row + 2);
-            }
+                var row: usize = first_row;
 
-            fn drawHeader(rc: *spoon.Term.RenderContext, row: usize) !void {
+                // title row
                 try rc.setAttribute(.{ .fg = .none, .bold = true });
-
                 try rc.moveCursorTo(row, 0);
                 var rpw = rc.restrictedPaddingWriter(term.width);
                 const writer = rpw.writer();
                 try writer.writeAll(title);
                 try rpw.finish();
+                row += 1;
 
+                // headers row
                 var pos: usize = 0;
                 inline for (columns) |col| {
-                    try rc.moveCursorTo(row + 1, pos);
-                    const size = term.width * col.size / 100;
-                    rpw.len_left = size - 1;
+                    try rc.moveCursorTo(row, pos);
+                    const size = term.width * col.size / 125; // 80% for headers, 20% for image
+                    rpw = rc.restrictedPaddingWriter(size - 1);
                     try writer.writeAll(col.header_name);
                     pos += size;
                 }
-                try rpw.finish();
-            }
+                {
+                    try rc.moveCursorTo(row, pos);
+                    const size = term.width * 20 / 100;
+                    rpw = rc.restrictedPaddingWriter(size);
+                    try writer.writeAll("Image");
+                    try rpw.finish();
+                }
+                row += 1;
 
-            fn drawEntries(
-                items: []const T,
-                rc: *spoon.Term.RenderContext,
-                first_row: usize,
-                selected_row: usize,
-            ) !void {
-                for (items, first_row..) |item, row| {
-                    try rc.moveCursorTo(row, 0);
-                    var rpw = rc.restrictedPaddingWriter(term.width);
-                    const writer = rpw.writer();
+                // items rows
+                const sel_row = selected_row + row - first_row;
+                for (items, row..) |item, x| {
+                    try rc.moveCursorTo(x, 0);
+                    rpw = rc.restrictedPaddingWriter(term.width);
 
-                    if (row == selected_row) {
+                    if (x == sel_row) {
                         try rc.setAttribute(.{ .reverse = true, .fg = .none });
                         try rpw.pad();
                     } else {
                         try rc.setAttribute(.{ .fg = .none });
                     }
 
-                    var pos: usize = 0;
+                    var y: usize = 0;
                     inline for (columns) |col| {
-                        try rc.moveCursorTo(row, pos);
-                        const size = term.width * col.size / 100;
-                        rpw.len_left = size - 1;
+                        try rc.moveCursorTo(x, y);
+                        const size = term.width * col.size / 125; // same as above
+                        rpw = rc.restrictedPaddingWriter(size - 1);
                         try writeField(col.field, item, writer);
-                        pos += size;
+                        y += size;
                         try rpw.finish();
                     }
                 }
+
+                // selected item image
+                {
+                    const col = term.width * 80 / 100 - 1;
+                    const size = term.width * 20 / 100 + 2;
+                    if (image_url) |url| {
+                        _ = try drawImage(rc, url, row, col, size);
+                    } else {
+                        try rc.moveCursorTo(row, col);
+                        rpw = rc.restrictedPaddingWriter(size);
+                        try writer.writeAll("No image");
+                        try rpw.finish();
+                    }
+                }
+            }
+
+            fn drawImage(
+                rc: *spoon.Term.RenderContext,
+                url: []const u8,
+                start_x: usize,
+                y: usize,
+                size: usize,
+            ) !usize {
+                // TODO: allocator
+                var image = try fetchAlbumImage(std.heap.c_allocator, url);
+                defer image.deinit();
+
+                const cell_width = term.width_pixels / term.width;
+                const cell_height = term.height_pixels / term.height;
+                const font_ratio = @as(f64, @floatFromInt(cell_width)) / @as(f64, @floatFromInt(cell_height));
+                var w: c.gint = @intCast(size);
+                var h: c.gint = @intCast(size);
+                c.chafa_calc_canvas_geometry(
+                    @intCast(image.width),
+                    @intCast(image.height),
+                    &w,
+                    &h,
+                    @floatCast(font_ratio),
+                    @intFromBool(false),
+                    @intFromBool(false),
+                );
+
+                c.chafa_canvas_config_set_cell_geometry(
+                    chafa_config,
+                    @intCast(cell_width),
+                    @intCast(cell_height),
+                );
+                c.chafa_canvas_config_set_geometry(chafa_config, w, h);
+
+                const canvas = c.chafa_canvas_new(chafa_config).?;
+                defer c.chafa_canvas_unref(canvas);
+
+                c.chafa_canvas_draw_all_pixels(
+                    canvas,
+                    c.CHAFA_PIXEL_RGB8,
+                    image.pixels.ptr,
+                    @intCast(image.width),
+                    @intCast(image.height),
+                    @intCast(image.width * Image.channel_count),
+                );
+                const gs = c.chafa_canvas_print(canvas, getTermInfo());
+                defer _ = c.g_string_free(gs, @intFromBool(true));
+
+                var iter = std.mem.tokenizeScalar(u8, gs.*.str[0..gs.*.len], '\n');
+                var x: usize = start_x;
+                while (iter.next()) |line| : (x += 1) {
+                    try rc.moveCursorTo(x, y);
+                    try rc.buffer.writer().writeAll(line);
+                }
+
+                return @intCast(h);
             }
         }.draw;
     }

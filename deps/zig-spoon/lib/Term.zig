@@ -50,6 +50,8 @@ cooked_termios: os.termios = undefined,
 /// Size of the terminal, updated fetchSize() is called.
 width: usize = undefined,
 height: usize = undefined,
+width_pixels: usize = undefined,
+height_pixels: usize = undefined,
 
 /// Are we currently rendering?
 currently_rendering: bool = false,
@@ -78,7 +80,7 @@ pub fn init(self: *Self, term_config: TermConfig) !void {
     };
 }
 
-pub fn deinit(self: *Self) !void {
+pub fn deinit(self: *Self) void {
     debug.assert(!self.currently_rendering);
 
     // Allow multiple calls to deinit, even if init never succeeded. This makes
@@ -236,6 +238,8 @@ pub fn fetchSize(self: *Self) !void {
     }
     self.height = size.ws_row;
     self.width = size.ws_col;
+    self.width_pixels = size.ws_xpixel;
+    self.height_pixels = size.ws_ypixel;
 }
 
 /// Set window title using OSC 2. Shall not be called while rendering.
