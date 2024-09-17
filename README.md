@@ -81,6 +81,6 @@ Benchmark 2 (43 runs): ./run zpotify
 ```
 
 ## TODO
-- finish `search` and add it to _zpotify
+- finish `search`
 - redo the perf analysis
 - add test coverage

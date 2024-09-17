@@ -6,19 +6,33 @@ const cmd = @import("../cmd.zig");
 const Table = ui.Table;
 
 // this is allocation fest
-// TODO: add number in ui like in vim?
 // TODO: add a way to display errors e.g. no active device
-// TODO: add mouse support for clicking on a row
 
 pub const usage =
     \\Usage: {s} search [track|artist|album|playlist] [query]...
     \\
     \\Description: Search a track, playlist, album, or artist with a TUI
     \\
-    // TODO
-    // \\Commands:
-    // \\  q    Quit
-    // \\
+    \\Commands:
+    \\  q or escape                        Quit
+    \\  right-click                        Select a row
+    \\  j or arrow-down or scroll-down     Move down one row
+    \\  k or arrow-up or scroll-up         Move up one row
+    \\  l or arrow-right                   Move to the next table or play the selected track
+    \\  h or arrow-left                    Move to the previous table
+    \\  g or home                          Move to the top of the table
+    \\  G or end                           Move to the bottom of the table
+    \\  d or C-d or page-down              Move down one page
+    \\  u or C-u or page-up                Move up one page
+    \\  enter                              Play the selected item and quit
+    \\  p                                  Play the selected item
+    \\  s                                  Save the selected item
+    // \\  r                                  Remove the selected track
+    // \\  - or _                             Decrease volume
+    // \\  + or =                             Increase volume
+    // \\  ?                                  Display help
+    // \\  /                                  Search
+    \\
 ;
 
 var current_table: *Table = undefined;
@@ -83,16 +97,21 @@ fn loop() !void {
 
         const read = try ui.term.readInput(&buf);
         var it = spoon.inputParser(buf[0..read]);
-        // TODO: ui.term.height - 5 can be less than 0 here
         while (it.next()) |in| {
             if (in.eqlDescription("escape") or in.eqlDescription("q")) {
                 return;
+            } else if (in.content == .mouse and in.content.mouse.button == .btn1) {
+                // single click -> select clicked row
+                if (in.content.mouse.y > 2 and in.content.mouse.y <= current_table.displayed() + 2) {
+                    current_table.selected = in.content.mouse.y - 3;
+                    try render();
+                }
             } else if (in.eqlDescription("arrow-down") or in.eqlDescription("j") or
                 (in.content == .mouse and in.content.mouse.button == .scroll_down))
             {
                 if (current_table.selected < current_table.len() - 1) {
                     current_table.selected += 1;
-                    if (current_table.selected - current_table.start >= ui.term.height - 5) {
+                    if (current_table.selected - current_table.start >= current_table.displayed()) {
                         current_table.start += 1;
                     }
                     try render();
@@ -115,34 +134,36 @@ fn loop() !void {
                     try current_table.play();
                     continue;
                 };
-                current_table.selected = 0;
-                current_table.start = 0;
+                current_table.resetPosition();
                 try render();
             } else if (in.eqlDescription("arrow-left") or in.eqlDescription("h")) {
                 current_table = current_table.prevTable() orelse continue;
                 try render();
-            } else if (in.eqlDescription("G")) {
+            } else if (in.eqlDescription("G") or in.eqlDescription("end")) {
                 current_table.selected = current_table.len() - 1;
-                current_table.start = current_table.len() -| (ui.term.height - 5);
+                current_table.start = current_table.len() - current_table.displayed();
                 try render();
-            } else if (in.eqlDescription("g")) {
-                current_table.selected = 0;
-                current_table.start = 0;
+            } else if (in.eqlDescription("g") or in.eqlDescription("home")) {
+                current_table.resetPosition();
                 try render();
-            } else if (in.eqlDescription("d") or in.eqlDescription("page-down")) {
+            } else if (in.eqlDescription("d") or in.eqlDescription("C-d") or
+                in.eqlDescription("page-down"))
+            {
                 if (current_table.selected + Table.limit < current_table.len() - 1 or
                     try current_table.fetchNext())
                 {
                     current_table.selected += Table.limit;
-                    if (current_table.selected - current_table.start >= ui.term.height - 5) {
+                    if (current_table.selected - current_table.start >= current_table.displayed()) {
                         current_table.start += Table.limit;
                         // make selected row be at the end of the screen to be the opposite of 'u'
                         const selected_row = 1 + current_table.selected - current_table.start;
-                        current_table.start -= (ui.term.height - 5) - selected_row;
+                        current_table.start -= current_table.displayed() - selected_row;
                     }
                     try render();
                 }
-            } else if (in.eqlDescription("u") or in.eqlDescription("page-up")) {
+            } else if (in.eqlDescription("u") or in.eqlDescription("C-u") or
+                in.eqlDescription("page-up"))
+            {
                 if (current_table.selected > 0) {
                     current_table.selected -|= Table.limit;
                     if (current_table.selected < current_table.start) {
@@ -226,7 +247,7 @@ fn drawFooter(rc: *spoon.Term.RenderContext) !void {
     try rc.moveCursorTo(ui.term.height - 1, 0);
     try rc.setAttribute(.{ .fg = .none, .bg = .cyan });
     rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().writeAll("[q] Quit [h] Go back [j] Down [k] Up..."); // TODO
+    try rpw.writer().writeAll("[q] Quit [h] Back [j] Down [k] Up [l] Forward [g] Top [G] Bottom [s] Save [p] Play [enter] Play and Quit");
     try rpw.pad();
 }
 
@@ -241,7 +262,8 @@ fn drawNotification(msg: union { err: anyerror, str: []const u8 }) !void {
 }
 
 fn handleSigWinch(_: c_int) callconv(.C) void {
-    ui.term.fetchSize() catch {};
+    ui.term.fetchSize() catch return;
+    current_table.resetPosition();
     if (!ui.term.currently_rendering) {
         render() catch {};
     }

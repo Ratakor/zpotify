@@ -9,32 +9,38 @@ const c = @cImport({
 
 pub var term: spoon.Term = undefined;
 var err_mgr: c.jpeg_error_mgr = undefined; // TODO: custom setup
-pub var cinfo: c.jpeg_decompress_struct = undefined;
-pub var chafa_config: *c.ChafaCanvasConfig = undefined;
+var cinfo: c.jpeg_decompress_struct = undefined;
+var term_info: *c.ChafaTermInfo = undefined;
+var chafa_config: *c.ChafaCanvasConfig = undefined;
 
 pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
     try term.init(.{});
     errdefer term.deinit();
 
-    try std.posix.sigaction(std.posix.SIG.WINCH, &std.posix.Sigaction{
+    const sa: std.posix.Sigaction = .{
         .handler = .{ .handler = sigWinchHandler },
         .mask = std.posix.empty_sigset,
         .flags = 0,
-    }, null);
+    };
+    try std.posix.sigaction(std.posix.SIG.WINCH, &sa, null);
+
     try term.uncook(.{ .request_mouse_tracking = true });
     try term.fetchSize();
 
     cinfo.err = c.jpeg_std_error(&err_mgr);
 
+    term_info = c.chafa_term_db_detect(c.chafa_term_db_get_default(), std.c.environ).?;
+
     const symbol_map = c.chafa_symbol_map_new().?;
     defer c.chafa_symbol_map_unref(symbol_map);
     c.chafa_symbol_map_add_by_tags(symbol_map, c.CHAFA_SYMBOL_TAG_HALF);
     chafa_config = c.chafa_canvas_config_new().?;
-    try detectTerminal(chafa_config);
     c.chafa_canvas_config_set_symbol_map(chafa_config, symbol_map);
+    detectTerminal(chafa_config);
 }
 
 pub fn deinit() void {
+    c.chafa_term_info_unref(term_info);
     c.chafa_canvas_config_unref(chafa_config);
     term.deinit();
 }
@@ -52,23 +58,24 @@ pub const Image = struct {
     }
 };
 
-fn getCachePath(allocator: std.mem.Allocator, id: []const u8) ![]const u8 {
+fn getCachePath(allocator: std.mem.Allocator, name: []const u8) ![]const u8 {
     if (std.posix.getenv("XDG_CACHE_HOME")) |xdg_cache| {
-        return std.fmt.allocPrint(allocator, "{s}/zpotify/{s}.jpeg", .{ xdg_cache, id });
+        return std.fmt.allocPrint(allocator, "{s}/zpotify/{s}.jpeg", .{ xdg_cache, name });
     } else if (std.posix.getenv("HOME")) |home| {
-        return std.fmt.allocPrint(allocator, "{s}/.cache/zpotify/{s}.jpeg", .{ home, id });
+        return std.fmt.allocPrint(allocator, "{s}/.cache/zpotify/{s}.jpeg", .{ home, name });
     } else {
         return error.EnvironmentVariableNotFound;
     }
 }
 
 // do not use with an arena
-pub fn fetchAlbumImage(allocator: std.mem.Allocator, url: []const u8) !Image {
+pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     const cwd = std.fs.cwd();
-    const id = url[std.mem.lastIndexOfScalar(u8, url, '/').? + 1 ..];
-    const cache_path = try getCachePath(allocator, id);
+    const name = url[std.mem.lastIndexOfScalar(u8, url, '/').? + 1 ..];
+    const cache_path = try getCachePath(allocator, name);
     defer allocator.free(cache_path);
-    const raw_image = if (cwd.openFile(cache_path, .{})) |file| blk: {
+
+    const jpeg_image = if (cwd.openFile(cache_path, .{})) |file| blk: {
         defer file.close();
         break :blk try file.readToEndAlloc(allocator, 1024 * 1024);
     } else |err| blk: {
@@ -87,17 +94,23 @@ pub fn fetchAlbumImage(allocator: std.mem.Allocator, url: []const u8) !Image {
             .method = .GET,
             .location = .{ .url = url },
             .response_storage = .{ .dynamic = &response },
+            .max_append_size = 1024 * 1024,
         });
-        std.debug.assert(result.status == .ok); // TODO
+
+        if (result.status != .ok) {
+            std.log.err("Failed to fetch {s}: {d}", .{ url, result.status });
+            std.log.debug("Response: {s}", .{response.items});
+            return error.BadResponse;
+        }
 
         try file.writeAll(response.items);
         break :blk try response.toOwnedSlice();
     };
-    defer allocator.free(raw_image);
+    defer allocator.free(jpeg_image);
 
     c.jpeg_create_decompress(&cinfo);
     defer c.jpeg_destroy_decompress(&cinfo);
-    c.jpeg_mem_src(&cinfo, raw_image.ptr, raw_image.len);
+    c.jpeg_mem_src(&cinfo, jpeg_image.ptr, jpeg_image.len);
     _ = c.jpeg_read_header(&cinfo, @intFromBool(true));
     _ = c.jpeg_start_decompress(&cinfo);
     defer _ = c.jpeg_finish_decompress(&cinfo);
@@ -106,7 +119,7 @@ pub fn fetchAlbumImage(allocator: std.mem.Allocator, url: []const u8) !Image {
         return error.UnsupportedImageFormat;
     }
 
-    const row_stride = cinfo.output_width * @as(c_uint, @intCast(cinfo.output_components));
+    const row_stride = cinfo.output_width * Image.channel_count;
     var pixels = try allocator.alloc(u8, cinfo.image_height * row_stride);
     errdefer allocator.free(pixels);
 
@@ -125,20 +138,33 @@ pub fn fetchAlbumImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     };
 }
 
-fn getTermInfo() ?*c.ChafaTermInfo {
-    return c.chafa_term_db_detect(c.chafa_term_db_get_default(), std.c.environ);
-}
-
-fn detectTerminal(config: *c.ChafaCanvasConfig) !void {
-    const term_info = getTermInfo() orelse return error.TermInfoNotFound;
-
+fn detectTerminal(config: *c.ChafaCanvasConfig) void {
     if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FGBG_DIRECT) != 0 and
         c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FG_DIRECT) != 0 and
         c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_BG_DIRECT) != 0)
     {
         c.chafa_canvas_config_set_canvas_mode(config, c.CHAFA_CANVAS_MODE_TRUECOLOR);
+    } else if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FGBG_256) != 0 and
+        c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FG_256) != 0 and
+        c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_BG_256) != 0)
+    {
+        c.chafa_canvas_config_set_canvas_mode(config, c.CHAFA_CANVAS_MODE_INDEXED_240);
+    } else if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FGBG_16) != 0 and
+        c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FG_16) != 0 and
+        c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_BG_16) != 0)
+    {
+        c.chafa_canvas_config_set_canvas_mode(config, c.CHAFA_CANVAS_MODE_INDEXED_16);
+    } else if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FGBG_8) != 0 and
+        c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_FG_8) != 0 and
+        c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_SET_COLOR_BG_8) != 0)
+    {
+        c.chafa_canvas_config_set_canvas_mode(config, c.CHAFA_CANVAS_MODE_INDEXED_8);
+    } else if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_INVERT_COLORS) != 0 and
+        c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_RESET_ATTRIBUTES) != 0)
+    {
+        c.chafa_canvas_config_set_canvas_mode(config, c.CHAFA_CANVAS_MODE_FGBG_BGFG);
     } else {
-        return error.TrueColorNotSupported;
+        c.chafa_canvas_config_set_canvas_mode(config, c.CHAFA_CANVAS_MODE_FGBG);
     }
 
     if (c.chafa_term_info_have_seq(term_info, c.CHAFA_TERM_SEQ_BEGIN_KITTY_IMMEDIATE_IMAGE_V1) != 0) {
@@ -251,12 +277,27 @@ pub const Table = struct {
         return true;
     }
 
+    pub fn displayed(self: Table) usize {
+        // 0                       is the header from cmd.search.drawHeader()
+        // 1                       is the title from Table.draw()
+        // 2                       are the headers from Table.draw()
+        // 3 to term.height - 3    are all items
+        // term.height - 2         is the footer from cmd.search.drawFooter()
+        // term.height - 1         is the command helper from cmd.search.drawFooter()
+        return @min(self.len(), term.height -| 5);
+    }
+
+    pub fn resetPosition(self: *Table) void {
+        self.start = 0;
+        self.selected = 0;
+    }
+
     pub fn draw(self: Table, rc: *spoon.Term.RenderContext, first_row: usize) !void {
         const start = self.start;
-        const end = @min(self.len(), self.start + term.height - 5);
+        const end = self.start + self.displayed();
         const selected_row = first_row + self.selected - self.start;
 
-        // TODO: find a way to use an inline else
+        // TODO: find a way to use an inline else or make this better
         switch (self.list) {
             .tracks => |list| try drawTracks(
                 list.items[start..end],
@@ -515,7 +556,7 @@ pub const Table = struct {
                 size: usize,
             ) !usize {
                 // TODO: allocator
-                var image = try fetchAlbumImage(std.heap.c_allocator, url);
+                var image = try fetchImage(std.heap.c_allocator, url);
                 defer image.deinit();
 
                 const cell_width = term.width_pixels / term.width;
@@ -551,7 +592,7 @@ pub const Table = struct {
                     @intCast(image.height),
                     @intCast(image.width * Image.channel_count),
                 );
-                const gs = c.chafa_canvas_print(canvas, getTermInfo());
+                const gs = c.chafa_canvas_print(canvas, term_info);
                 defer _ = c.g_string_free(gs, @intFromBool(true));
 
                 var iter = std.mem.tokenizeScalar(u8, gs.*.str[0..gs.*.len], '\n');

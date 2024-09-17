@@ -18,10 +18,8 @@ _zpotify() {
             format_options=($format_options)
             _arguments -s "*:format:(($format_options))"
             ;;
-        play)
-            _arguments -s \
-                "2:query_type:(track playlist album artist)" \
-                "--limit[Limit the number of results to display (1-50)]"
+        play|search)
+            _arguments -s "2:query_type:(track playlist album artist)"
             ;;
         repeat)
             _arguments -s "2:repeat_mode:(track context off)"
