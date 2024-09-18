@@ -24,7 +24,6 @@ pub const usage =
     \\  i                                  Toggle image display
     \\  s                                  Save the selected entry to the library
     \\  r                                  Remove the selected entry from the library
-    // \\  /                                  Search
     \\  p                                  Play the selected entry
     \\  enter                              Play the selected entry and quit
     \\
@@ -154,6 +153,10 @@ fn loop() !void {
                         current_table.start -= current_table.displayed() - selected_row;
                     }
                     try render();
+                } else if (current_table.selected < current_table.len() - 1) {
+                    current_table.selected = current_table.len() - 1;
+                    current_table.start = current_table.len() - current_table.displayed();
+                    try render();
                 }
             } else if (in.eqlDescription("u") or in.eqlDescription("C-u") or in.eqlDescription("page-up")) {
                 if (current_table.selected > 0) {
@@ -184,10 +187,6 @@ fn loop() !void {
             } else if (in.eqlDescription("r")) {
                 try current_table.remove(); // add remove command?
                 try notifyAction("Removed");
-            } else if (in.eqlDescription("/")) {
-                // TODO: search and reset
-                // ask for kind and query
-                // if kind is wrong assume it's the same as before and that it's part of the query
             } else if (in.content != .mouse) {
                 try notify(.err, "Invalid input: {}", .{in});
             }
@@ -214,7 +213,8 @@ fn render() !void {
     } else {
         try drawHeader(&rc, current_table.title);
         try current_table.draw(&rc, 1);
-        try drawFooter(&rc, "[q] Quit [h] Back [j] Down [k] Up [l] Forward [g] Top [G] Bottom [s] Save [r] Remove [p] Play [enter] Play and Quit");
+        try drawFooter(&rc, "[q] Quit [h] Back [j] Down [k] Up [l] Forward " ++
+            "[g] Top [G] Bottom [s] Save [r] Remove [i] Toggle images [p] Play [enter] Play and Quit");
     }
 }
 

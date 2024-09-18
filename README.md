@@ -1,6 +1,8 @@
 # zpotify
 zpotify is a CLI for controlling Spotify playback and much more!
 
+https://github.com/user-attachments/assets/40e91cb7-a8a3-4eae-840f-b073221ce0c3
+
 ## Installation
 
 ### [AUR](https://aur.archlinux.org/packages/zpotify)
@@ -23,6 +25,7 @@ zig build -Doptimize=ReleaseFast
 Zsh completions are available [here](_zpotify)!
 
 ## Usage
+Requires Spotify premium.
 ```
 Usage: zpotify [command] [options]
 
@@ -80,7 +83,11 @@ Benchmark 2 (43 runs): ./run zpotify
   branch_misses      5.97M  ± 1.93M     4.60M  … 11.4M           6 (14%)        ⚡- 85.4% ±  2.5%
 ```
 
+## Credits
+- [baton](https://github.com/joshuathompson/baton)
+- [zig-spoon](https://git.sr.ht/~leon_plickat/zig-spoon)
+- [chafa](https://github.com/hpjansson/chafa)
+
 ## TODO
-- finish `search`
 - redo the perf analysis
 - add test coverage
