@@ -87,7 +87,7 @@ fn loop() !void {
         .events = std.posix.POLL.IN,
         .revents = undefined,
     };
-    var buf: [16]u8 = undefined;
+    var buf: [48]u8 = undefined; // must be a multiple of 6
     while (true) {
         _ = try std.posix.poll(&fds, -1);
 

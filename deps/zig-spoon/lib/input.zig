@@ -57,6 +57,10 @@ pub const Input = struct {
             fmt.invalidFmtError(fmt, self);
         }
 
+        if (self.mod_super or self.mod_ctrl or self.mod_alt) {
+            try writer.writeAll("<");
+        }
+
         if (self.mod_super) {
             try writer.writeAll("S-");
         }
@@ -67,7 +71,11 @@ pub const Input = struct {
             try writer.writeAll("A-");
         }
 
-        try writer.print("{}", .{self.content});
+        try self.content.format("", .{}, writer);
+
+        if (self.mod_super or self.mod_ctrl or self.mod_alt) {
+            try writer.writeAll(">");
+        }
     }
 };
 
@@ -249,6 +257,16 @@ const InputParser = struct {
         if (self.bytes.?[1] == 'O' and self.bytes.?.len > 2) {
             return self.singleLetterEscapeSequence();
         }
+
+        // Handle Ctrl-Alt-[a-z]
+        //switch (self.bytes.?[1]) {
+        //    'a' & '\x1F'...'z' & '\x1F' => |ctrl_byte| {
+        //        defer self.advanceBufferBy(2);
+        //        const byte = ctrl_byte + 0x60;
+        //        return Input{ .content = .{ .codepoint = byte }, .mod_ctrl = true, .mod_alt = true };
+        //    },
+        //    else => {},
+        //}
 
         // If this point is reached, this is not an escape sequence, at least
         // not one that follows any common standard I am aware of. So let's just
