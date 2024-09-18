@@ -2,11 +2,10 @@ const std = @import("std");
 const spoon = @import("spoon");
 const api = @import("../api.zig");
 const ui = @import("../ui.zig");
-const cmd = @import("../cmd.zig");
+const help = @import("../cmd.zig").help;
 const Table = ui.Table;
 
 // this is allocation fest
-// TODO: add a way to display errors e.g. no active device
 
 pub const usage =
     \\Usage: {s} search [track|artist|album|playlist] [query]...
@@ -28,9 +27,8 @@ pub const usage =
     \\  p                                  Play the selected item
     \\  s                                  Save the selected item
     // \\  r                                  Remove the selected track
-    // \\  - or _                             Decrease volume
-    // \\  + or =                             Increase volume
-    // \\  ?                                  Display help
+    \\  - or _                             Decrease volume
+    \\  + or =                             Increase volume
     // \\  /                                  Search
     \\
 ;
@@ -45,12 +43,12 @@ pub fn exec(
     const kind = if (args.next()) |arg| blk: {
         break :blk std.meta.stringToEnum(Table.Kind, arg) orelse {
             std.log.err("Invalid query type: '{s}'", .{arg});
-            cmd.help.exec("search");
+            help.exec("search");
             std.process.exit(1);
         };
     } else {
         std.log.err("Missing query type", .{});
-        cmd.help.exec("search");
+        help.exec("search");
         std.process.exit(1);
     };
 
@@ -66,7 +64,7 @@ pub fn exec(
         }
         if (builder.items.len == 0) {
             std.log.err("Missing query", .{});
-            cmd.help.exec("search");
+            help.exec("search");
             std.process.exit(1);
         }
         break :blk try std.mem.join(allocator, " ", builder.items);
@@ -131,7 +129,10 @@ fn loop() !void {
             } else if (in.eqlDescription("arrow-right") or in.eqlDescription("l")) {
                 current_table = try current_table.nextTable() orelse {
                     // current_table is a track -> play it
-                    try current_table.play();
+                    current_table.play() catch |err| switch (err) {
+                        error.NoActiveDevice => try notify(.err, "No active device", .{}),
+                        else => return err,
+                    };
                     continue;
                 };
                 current_table.resetPosition();
@@ -172,33 +173,54 @@ fn loop() !void {
                     try render();
                 }
             } else if (in.eqlDescription("enter")) {
-                current_table.play() catch |err| switch (err) {
-                    error.NoActiveDevice => {}, // TODO: display error
+                if (current_table.play()) {
+                    return;
+                } else |err| switch (err) {
+                    error.NoActiveDevice => try notify(.err, "No active device", .{}),
                     else => return err,
-                };
-                return;
+                }
             } else if (in.eqlDescription("p")) {
                 current_table.play() catch |err| switch (err) {
-                    error.NoActiveDevice => {}, // TODO: display error
+                    error.NoActiveDevice => try notify(.err, "No active device", .{}),
                     else => return err,
                 };
             } else if (in.eqlDescription("s")) {
                 try current_table.save(); // rename like command to save?
-                // TODO: notify user
+                switch (current_table.selectedItem()) {
+                    .track => |track| try notify(.info, "Saved track '{s}' from '{s}' by {s}", .{
+                        track.name,
+                        track.album.name,
+                        track.artists[0].name,
+                    }),
+                    .album => |album| try notify(.info, "Saved album '{s}' by {s}", .{
+                        album.name,
+                        album.artists[0].name,
+                    }),
+                    .artist => |artist| try notify(.info, "Saved artist '{s}'", .{
+                        artist.name,
+                    }),
+                    .playlist => |playlist| try notify(.info, "Saved playlist '{s}' by {s}", .{
+                        playlist.name,
+                        playlist.owner.display_name orelse playlist.owner.id,
+                    }),
+                }
             } else if (in.eqlDescription("r")) {
                 // TODO: do it in 's'? (no)
                 // try current_table.remove(); // TODO: + add remove command
-                // TODO: notify user
             } else if (in.eqlDescription("-") or in.eqlDescription("_")) {
-                // try cmd.vol.exec(current_table.client, "down"); // TODO: display log correctly
+                updateVolume(current_table.client, .down) catch |err| {
+                    try notify(.err, "Failed to update volume: {}", .{err});
+                };
             } else if (in.eqlDescription("+") or in.eqlDescription("=")) {
-                // try cmd.vol.exec(current_table.client, "up"); // TODO: display log correctly
-            } else if (in.eqlDescription("?")) {
-                // TODO: help?
+                updateVolume(current_table.client, .up) catch |err| {
+                    try notify(.err, "Failed to update volume: {}", .{err});
+                };
             } else if (in.eqlDescription("/")) {
                 // TODO: search and reset
                 // ask for kind and query
                 // if kind is wrong assume it's the same as before and that it's part of the query
+            } else if (in.content != .mouse) {
+                try notify(.err, "Invalid input: {}", .{in});
             }
         }
     }
@@ -219,10 +241,6 @@ fn render() !void {
     try drawHeader(&rc);
     try current_table.draw(&rc, 1);
     try drawFooter(&rc);
-
-    // if (current_table.imageUrl()) |url| {
-    //     try ui.drawImage(&rc, url, 0, 0);
-    // }
 }
 
 fn drawHeader(rc: *spoon.Term.RenderContext) !void {
@@ -251,14 +269,31 @@ fn drawFooter(rc: *spoon.Term.RenderContext) !void {
     try rpw.pad();
 }
 
-// fn drawNotification(msg: []const u8, err: ?anyerror) !void {
-fn drawNotification(msg: union { err: anyerror, str: []const u8 }) !void {
+const Level = enum {
+    err,
+    info,
+
+    pub fn asText(comptime self: Level) []const u8 {
+        return switch (self) {
+            .err => "error",
+            .info => "info",
+        };
+    }
+};
+
+fn notify(comptime level: Level, comptime fmt: []const u8, args: anytype) !void {
     var rc = try ui.term.getRenderContext();
     defer rc.done() catch {};
 
-    // TODO: if err display in red and bold else in green and bold?
-    //       just text or text with a border?
-    _ = msg;
+    try rc.moveCursorTo(ui.term.height - 1, 0);
+    var rpw = rc.restrictedPaddingWriter(ui.term.width);
+    switch (level) {
+        .err => try rc.setAttribute(.{ .fg = .none, .bg = .red, .bold = true }),
+        .info => try rc.setAttribute(.{ .fg = .none, .bg = .green, .bold = true }),
+    }
+    const level_txt = comptime level.asText();
+    try rpw.writer().print(level_txt ++ ": " ++ fmt, args);
+    try rpw.pad();
 }
 
 fn handleSigWinch(_: c_int) callconv(.C) void {
@@ -304,4 +339,21 @@ fn fetchPlaylists(self: *Table) !void {
     try self.list.playlists.appendSlice(self.allocator, result.playlists.?.items);
     self.total = result.playlists.?.total;
     self.has_next = result.playlists.?.next != null;
+}
+
+fn updateVolume(client: *api.Client, arg: enum { up, down }) !void {
+    const playback_state = try api.getPlaybackState(client);
+    const device = playback_state.device orelse return error.NoActiveDevice;
+    var volume = device.volume_percent orelse return error.VolumeControlNotSupported;
+
+    if (arg == .up) {
+        volume += 10;
+        if (volume > 100) {
+            volume = 100;
+        }
+    } else if (arg == .down) {
+        volume -|= 10;
+    }
+
+    try api.setVolume(client, volume);
 }

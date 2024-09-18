@@ -204,6 +204,12 @@ pub const Table = struct {
     next: std.AutoHashMapUnmanaged(usize, *Table) = .{},
 
     pub const Kind = enum { track, artist, album, playlist };
+    pub const Item = union(Kind) {
+        track: *const api.Track,
+        artist: *const api.Artist,
+        album: *const api.Album,
+        playlist: *const api.Playlist,
+    };
     pub const limit = 10;
     pub const limit_max = 50;
 
@@ -444,6 +450,15 @@ pub const Table = struct {
     pub fn len(self: Table) usize {
         switch (self.list) {
             inline else => |list| return list.items.len,
+        }
+    }
+
+    pub fn selectedItem(self: Table) Item {
+        switch (self.list) {
+            .tracks => |list| return .{ .track = &list.items[self.selected] },
+            .artists => |list| return .{ .artist = &list.items[self.selected] },
+            .albums => |list| return .{ .album = &list.items[self.selected] },
+            .playlists => |list| return .{ .playlist = &list.items[self.selected] },
         }
     }
 

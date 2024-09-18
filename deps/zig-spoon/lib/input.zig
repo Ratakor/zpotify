@@ -46,6 +46,29 @@ pub const Input = struct {
     mod_ctrl: bool = false,
     mod_super: bool = false,
     content: InputContent,
+
+    pub fn format(
+        self: Input,
+        comptime fmt_str: []const u8,
+        _: fmt.FormatOptions,
+        writer: anytype,
+    ) @TypeOf(writer).Error!void {
+        if (fmt_str.len != 0) {
+            fmt.invalidFmtError(fmt, self);
+        }
+
+        if (self.mod_super) {
+            try writer.writeAll("S-");
+        }
+        if (self.mod_ctrl) {
+            try writer.writeAll("C-");
+        }
+        if (self.mod_alt) {
+            try writer.writeAll("A-");
+        }
+
+        try writer.print("{}", .{self.content});
+    }
 };
 
 pub const InputContent = union(enum) {
@@ -69,6 +92,53 @@ pub const InputContent = union(enum) {
     codepoint: u21,
 
     mouse: struct { x: usize, y: usize, button: MouseButton },
+
+    pub fn format(
+        self: InputContent,
+        comptime fmt_str: []const u8,
+        _: fmt.FormatOptions,
+        writer: anytype,
+    ) @TypeOf(writer).Error!void {
+        if (fmt_str.len != 0) {
+            fmt.invalidFmtError(fmt, self);
+        }
+
+        switch (self) {
+            .unknown => try writer.writeAll("unknown"),
+            .escape => try writer.writeAll("escape"),
+            .arrow_up => try writer.writeAll("arrow-up"),
+            .arrow_down => try writer.writeAll("arrow-down"),
+            .arrow_left => try writer.writeAll("arrow-left"),
+            .arrow_right => try writer.writeAll("arrow-right"),
+            .begin => try writer.writeAll("begin"),
+            .end => try writer.writeAll("end"),
+            .home => try writer.writeAll("home"),
+            .page_up => try writer.writeAll("page-up"),
+            .page_down => try writer.writeAll("page-down"),
+            .delete => try writer.writeAll("delete"),
+            .insert => try writer.writeAll("insert"),
+            .print => try writer.writeAll("print"),
+            .scroll_lock => try writer.writeAll("scroll-lock"),
+            .pause => try writer.writeAll("pause"),
+            .function => |n| try writer.print("F{d}", .{n}),
+            .codepoint => |codepoint| {
+                if (codepoint == ' ') {
+                    try writer.writeAll("space");
+                } else if (codepoint == 127) {
+                    try writer.writeAll("backspace");
+                } else if (codepoint == '\n') {
+                    try writer.writeAll("enter");
+                } else {
+                    try writer.print("{u}", .{codepoint});
+                }
+            },
+            .mouse => |mouse| try writer.print("mouse({}, {}, {s})", .{
+                mouse.x,
+                mouse.y,
+                @tagName(mouse.button),
+            }),
+        }
+    }
 };
 
 pub const MouseButton = enum { btn1, btn2, btn3, release, scroll_up, scroll_down };
