@@ -51,10 +51,7 @@ pub fn exec(
         };
     } else {
         std.log.info("Resuming playback", .{});
-        api.startPlayback(client, null, null) catch |err| switch (err) {
-            error.NoActiveDevice => std.process.exit(1),
-            else => return err,
-        };
+        try api.startPlayback(client, null, null);
         return;
     };
 
@@ -141,15 +138,9 @@ fn startPlayback(
     };
 
     if (query == .track) {
-        api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id) catch |err| switch (err) {
-            error.NoActiveDevice => std.process.exit(1),
-            else => return err,
-        };
+        try api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id);
     } else {
-        api.startPlayback(client, .{ .context_uri = uri }, id) catch |err| switch (err) {
-            error.NoActiveDevice => std.process.exit(1),
-            else => return err,
-        };
+        try api.startPlayback(client, .{ .context_uri = uri }, id);
     }
 }
 

@@ -85,6 +85,7 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
         try cwd.makePath(cache_path[0..std.mem.lastIndexOfScalar(u8, cache_path, '/').?]);
         const file = try cwd.createFile(cache_path, .{});
         defer file.close();
+        errdefer cwd.deleteFile(cache_path) catch {};
 
         var client: std.http.Client = .{ .allocator = allocator };
         defer client.deinit();
@@ -98,7 +99,8 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
         });
 
         if (result.status != .ok) {
-            std.log.err("Failed to fetch {s}: {d}", .{ url, result.status });
+            // std.log.err("Failed to fetch {s}: {d}", .{ url, result.status });
+            std.log.debug("Failed to fetch {s}: {d}", .{ url, result.status });
             std.log.debug("Response: {s}", .{response.items});
             return error.BadResponse;
         }

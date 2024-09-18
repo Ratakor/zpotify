@@ -9,10 +9,7 @@ pub const usage =
 ;
 
 pub fn exec(client: *api.Client) !void {
-    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-        error.NotPlaying => std.process.exit(1),
-        else => return err,
-    };
+    const playback_state = try api.getPlaybackState(client);
 
     if (playback_state.is_playing) {
         std.log.info("Pausing playback", .{});

@@ -176,16 +176,10 @@ pub fn sendRequestOwned(
         },
         .no_content, .created, .accepted => {
             if (T != void) {
-                std.log.warn("Playback not available or active ({d})", .{
-                    @intFromEnum(req.response.status),
-                });
-                return error.NotPlaying;
+                return error.PlaybackNotAvailable;
             }
         },
-        .not_found => {
-            std.log.warn("No active device found ({d})", .{@intFromEnum(req.response.status)});
-            return error.NoActiveDevice;
-        },
+        .not_found => return error.NoActiveDevice,
         else => {
             const Error = struct {
                 @"error": struct {

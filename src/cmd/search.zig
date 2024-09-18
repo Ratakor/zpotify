@@ -129,9 +129,8 @@ fn loop() !void {
             } else if (in.eqlDescription("arrow-right") or in.eqlDescription("l")) {
                 current_table = try current_table.nextTable() orelse {
                     // current_table is a track -> play it
-                    current_table.play() catch |err| switch (err) {
-                        error.NoActiveDevice => try notify(.err, "No active device", .{}),
-                        else => return err,
+                    current_table.play() catch |err| {
+                        try notify(.err, "Failed to start playback: {}", .{err});
                     };
                     continue;
                 };
@@ -175,14 +174,12 @@ fn loop() !void {
             } else if (in.eqlDescription("enter")) {
                 if (current_table.play()) {
                     return;
-                } else |err| switch (err) {
-                    error.NoActiveDevice => try notify(.err, "No active device", .{}),
-                    else => return err,
+                } else |err| {
+                    try notify(.err, "Failed to start playback: {}", .{err});
                 }
             } else if (in.eqlDescription("p")) {
-                current_table.play() catch |err| switch (err) {
-                    error.NoActiveDevice => try notify(.err, "No active device", .{}),
-                    else => return err,
+                current_table.play() catch |err| {
+                    try notify(.err, "Failed to start playback: {}", .{err});
                 };
             } else if (in.eqlDescription("s")) {
                 try current_table.save(); // rename like command to save?

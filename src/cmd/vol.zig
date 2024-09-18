@@ -10,10 +10,7 @@ pub const usage =
 ;
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-        error.NotPlaying => std.process.exit(1),
-        else => return err,
-    };
+    const playback_state = try api.getPlaybackState(client);
 
     var volume = blk: {
         if (playback_state.device) |device| {

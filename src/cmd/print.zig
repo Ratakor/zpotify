@@ -58,10 +58,7 @@ fn escapeDefaultFormat() []const u8 {
 }
 
 pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
-    const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-        error.NotPlaying => std.process.exit(1),
-        else => return err,
-    };
+    const playback_state = try api.getPlaybackState(client);
 
     const stdout = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout);

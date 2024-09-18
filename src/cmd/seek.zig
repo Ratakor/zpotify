@@ -26,10 +26,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         std.log.info("Seeking to {d}:{d:0>2}", .{ min, sec });
         try api.seekToPosition(client, ms);
     } else {
-        const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-            error.NotPlaying => std.process.exit(1),
-            else => return err,
-        };
+        const playback_state = try api.getPlaybackState(client);
 
         if (playback_state.item) |track| {
             const progress_ms = playback_state.progress_ms;

@@ -37,9 +37,9 @@ pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
         defer stdout.writeAll("\n") catch {};
 
         const info = api.getPlaybackStateOwned(client, allocator) catch |err| switch (err) {
-            error.NotPlaying => continue,
+            error.PlaybackNotAvailable => continue,
             else => {
-                std.log.err("Failed to get playback state: {}\n", .{err});
+                std.log.err("zpotify: {}", .{err});
                 continue;
             },
         };

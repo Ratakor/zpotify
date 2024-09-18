@@ -22,10 +22,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         std.log.info("Setting repeat mode to {s}", .{state});
         try api.setRepeatMode(client, state);
     } else {
-        const playback_state = api.getPlaybackState(client) catch |err| switch (err) {
-            error.NotPlaying => std.process.exit(1),
-            else => return err,
-        };
+        const playback_state = try api.getPlaybackState(client);
         std.log.info("Repeat mode is currently set to {s}", .{playback_state.repeat_state});
     }
 }
