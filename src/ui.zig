@@ -4,12 +4,12 @@ const api = @import("api.zig");
 const c = @cImport({
     @cInclude("stdio.h");
     @cInclude("jpeglib.h");
+    @cInclude("jerror.h");
+    @cInclude("setjmp.h");
     @cInclude("chafa/chafa.h");
 });
 
 pub var term: spoon.Term = undefined;
-var err_mgr: c.jpeg_error_mgr = undefined; // TODO: custom setup
-var cinfo: c.jpeg_decompress_struct = undefined;
 var term_info: *c.ChafaTermInfo = undefined;
 var chafa_config: *c.ChafaCanvasConfig = undefined;
 
@@ -26,8 +26,6 @@ pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
 
     try term.uncook(.{ .request_mouse_tracking = true });
     try term.fetchSize();
-
-    cinfo.err = c.jpeg_std_error(&err_mgr);
 
     term_info = c.chafa_term_db_detect(c.chafa_term_db_get_default(), std.c.environ).?;
 
@@ -55,6 +53,33 @@ pub const Image = struct {
 
     pub fn deinit(self: @This()) void {
         self.allocator.free(self.pixels);
+    }
+};
+
+const JpegErrorManager = extern struct {
+    mgr: c.jpeg_error_mgr,
+    setjmp_buffer: c.jmp_buf,
+
+    fn init(self: *JpegErrorManager) *c.jpeg_error_mgr {
+        _ = c.jpeg_std_error(&self.mgr);
+        self.mgr.error_exit = errorExit;
+        self.mgr.output_message = outputMessage;
+        return &self.mgr;
+    }
+
+    fn errorExit(cinfo: c.j_common_ptr) callconv(.C) void {
+        const self: *JpegErrorManager = @ptrCast(cinfo.*.err);
+        self.mgr.output_message.?(cinfo);
+        c.longjmp(&self.setjmp_buffer, 1);
+    }
+
+    fn outputMessage(cinfo: c.j_common_ptr) callconv(.C) void {
+        const self: *JpegErrorManager = @ptrCast(cinfo.*.err);
+        var buffer: [c.JMSG_LENGTH_MAX]u8 = undefined;
+        const ptr: [*c]u8 = @ptrCast(&buffer);
+        self.mgr.format_message.?(cinfo, ptr);
+        const len = std.mem.len(ptr);
+        std.log.debug("jpeglib: {s}", .{ptr[0..len]});
     }
 };
 
@@ -110,8 +135,22 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     };
     defer allocator.free(jpeg_image);
 
+    var pixels: ?[]const u8 = null;
+
+    var cinfo: c.jpeg_decompress_struct = undefined;
     c.jpeg_create_decompress(&cinfo);
     defer c.jpeg_destroy_decompress(&cinfo);
+
+    var jerr: JpegErrorManager = undefined;
+    cinfo.err = jerr.init();
+
+    if (c.setjmp(&jerr.setjmp_buffer) != 0) {
+        if (pixels) |pix| {
+            allocator.free(pix);
+        }
+        return error.FailedToReadImage;
+    }
+
     c.jpeg_mem_src(&cinfo, jpeg_image.ptr, jpeg_image.len);
     _ = c.jpeg_read_header(&cinfo, @intFromBool(true));
     _ = c.jpeg_start_decompress(&cinfo);
@@ -122,12 +161,12 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     }
 
     const row_stride = cinfo.output_width * Image.channel_count;
-    var pixels = try allocator.alloc(u8, cinfo.image_height * row_stride);
-    errdefer allocator.free(pixels);
+    pixels = try allocator.alloc(u8, cinfo.image_height * row_stride);
+    errdefer allocator.free(pixels.?);
 
     var index: usize = 0;
-    while (index != pixels.len) {
-        const amt = c.jpeg_read_scanlines(&cinfo, @constCast(@ptrCast(&pixels.ptr[index..])), 1);
+    while (index != pixels.?.len) {
+        const amt = c.jpeg_read_scanlines(&cinfo, @constCast(@ptrCast(&pixels.?.ptr[index..])), 1);
         if (amt == 0) return error.FailedToReadImage;
         index += amt * row_stride;
     }
@@ -135,7 +174,7 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     return .{
         .width = cinfo.image_width,
         .height = cinfo.image_height,
-        .pixels = pixels,
+        .pixels = pixels.?,
         .allocator = allocator,
     };
 }
@@ -564,13 +603,24 @@ pub const Table = struct {
                     const col = term.width * 80 / 100 - 1;
                     const size = term.width * 20 / 100 + 2;
                     if (image_url) |url| {
-                        _ = try drawImage(rc, url, row, col, size);
-                    } else {
-                        try rc.moveCursorTo(row, col);
-                        rpw = rc.restrictedPaddingWriter(size);
-                        try writer.writeAll("No image");
-                        try rpw.finish();
+                        if (drawImage(rc, url, row, col, size)) {
+                            return;
+                        } else |err| switch (err) {
+                            error.FailedToReadImage => {}, // write "No image"
+                            error.UnsupportedImageFormat => {}, // write "No image"
+                            else => return err,
+                        }
                     }
+
+                    try rc.moveCursorTo(row, col);
+                    rpw = rc.restrictedPaddingWriter(size);
+                    if (row == sel_row) {
+                        try rc.setAttribute(.{ .reverse = true, .fg = .none });
+                    } else {
+                        try rc.setAttribute(.{ .fg = .none });
+                    }
+                    try writer.writeAll("No image");
+                    try rpw.finish();
                 }
             }
 
@@ -580,7 +630,7 @@ pub const Table = struct {
                 start_x: usize,
                 y: usize,
                 size: usize,
-            ) !usize {
+            ) !void {
                 // TODO: allocator
                 var image = try fetchImage(std.heap.c_allocator, url);
                 defer image.deinit();
@@ -627,8 +677,6 @@ pub const Table = struct {
                     try rc.moveCursorTo(x, y);
                     try rc.buffer.writer().writeAll(line);
                 }
-
-                return @intCast(h);
             }
         }.draw;
     }
