@@ -212,7 +212,7 @@ pub const Table = struct {
         album: *const api.Album,
         playlist: *const api.Playlist,
     };
-    pub const limit = 10;
+    pub const limit = 20;
     pub const limit_max = 50;
 
     pub fn init(
@@ -428,13 +428,22 @@ pub const Table = struct {
     pub fn save(self: Table) !void {
         switch (self.list) {
             .tracks => |list| try api.saveTracks(self.client, list.items[self.selected].id),
-            .artists => |list| try api.followArtist(self.client, list.items[self.selected].id),
+            .artists => |list| try api.followArtists(self.client, list.items[self.selected].id),
             .albums => |list| try api.saveAlbums(self.client, list.items[self.selected].id),
             .playlists => |list| try api.followPlaylist(self.client, list.items[self.selected].id),
         }
     }
 
-    pub fn imageUrl(self: Table) ?[]const u8 {
+    pub fn remove(self: Table) !void {
+        switch (self.list) {
+            .tracks => |list| try api.removeTracks(self.client, list.items[self.selected].id),
+            .artists => |list| try api.unfollowArtists(self.client, list.items[self.selected].id),
+            .albums => |list| try api.removeAlbums(self.client, list.items[self.selected].id),
+            .playlists => |list| try api.unfollowPlaylist(self.client, list.items[self.selected].id),
+        }
+    }
+
+    fn imageUrl(self: Table) ?[]const u8 {
         const images = switch (self.list) {
             .tracks => |list| list.items[self.selected].album.images,
             inline else => |list| list.items[self.selected].images,

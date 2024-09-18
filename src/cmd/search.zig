@@ -13,7 +13,7 @@ pub const usage =
     \\Description: Search a track, playlist, album, or artist with a TUI
     \\
     \\Commands:
-    \\  q or escape                        Quit
+    \\  q                                  Quit
     \\  right-click                        Select a row
     \\  j or arrow-down or scroll-down     Move down one row
     \\  k or arrow-up or scroll-up         Move up one row
@@ -23,13 +23,11 @@ pub const usage =
     \\  G or end                           Move to the bottom of the table
     \\  d or C-d or page-down              Move down one page
     \\  u or C-u or page-up                Move up one page
-    \\  enter                              Play the selected item and quit
-    \\  p                                  Play the selected item
-    \\  s                                  Save the selected item
-    // \\  r                                  Remove the selected track
-    \\  - or _                             Decrease volume
-    \\  + or =                             Increase volume
+    \\  s                                  Save the selected entry to the library
+    \\  r                                  Remove the selected entry from the library
     // \\  /                                  Search
+    \\  p                                  Play the selected entry
+    \\  enter                              Play the selected entry and quit
     \\
 ;
 
@@ -96,24 +94,24 @@ fn loop() !void {
         const read = try ui.term.readInput(&buf);
         var it = spoon.inputParser(buf[0..read]);
         while (it.next()) |in| {
-            if (in.eqlDescription("escape") or in.eqlDescription("q")) {
+            std.log.debug("Input: {}", .{in});
+
+            if (in.eqlDescription("q")) {
                 return;
             } else if (in.content == .mouse and in.content.mouse.button == .btn1) {
                 // single click -> select clicked row
                 if (in.content.mouse.y > 2 and in.content.mouse.y <= current_table.displayed() + 2) {
-                    current_table.selected = in.content.mouse.y - 3;
+                    current_table.selected = current_table.start + in.content.mouse.y - 3;
                     try render();
                 }
             } else if (in.eqlDescription("arrow-down") or in.eqlDescription("j") or
                 (in.content == .mouse and in.content.mouse.button == .scroll_down))
             {
-                if (current_table.selected < current_table.len() - 1) {
+                if (current_table.selected < current_table.len() - 1 or try current_table.fetchNext()) {
                     current_table.selected += 1;
                     if (current_table.selected - current_table.start >= current_table.displayed()) {
                         current_table.start += 1;
                     }
-                    try render();
-                } else if (try current_table.fetchNext()) {
                     try render();
                 }
             } else if (in.eqlDescription("arrow-up") or in.eqlDescription("k") or
@@ -127,15 +125,15 @@ fn loop() !void {
                     try render();
                 }
             } else if (in.eqlDescription("arrow-right") or in.eqlDescription("l")) {
-                current_table = try current_table.nextTable() orelse {
-                    // current_table is a track -> play it
-                    current_table.play() catch |err| {
-                        try notify(.err, "Failed to start playback: {}", .{err});
-                    };
-                    continue;
-                };
-                current_table.resetPosition();
-                try render();
+                if (try current_table.nextTable()) |next_table| {
+                    current_table = next_table;
+                    current_table.resetPosition();
+                    try render();
+                } else if (current_table.play()) { // current_table is a track -> play it
+                    try notifyAction("Playing");
+                } else |err| {
+                    try notify(.err, "Failed to start playback: {}", .{err});
+                }
             } else if (in.eqlDescription("arrow-left") or in.eqlDescription("h")) {
                 current_table = current_table.prevTable() orelse continue;
                 try render();
@@ -146,12 +144,8 @@ fn loop() !void {
             } else if (in.eqlDescription("g") or in.eqlDescription("home")) {
                 current_table.resetPosition();
                 try render();
-            } else if (in.eqlDescription("d") or in.eqlDescription("C-d") or
-                in.eqlDescription("page-down"))
-            {
-                if (current_table.selected + Table.limit < current_table.len() - 1 or
-                    try current_table.fetchNext())
-                {
+            } else if (in.eqlDescription("d") or in.eqlDescription("C-d") or in.eqlDescription("page-down")) {
+                if (current_table.selected + Table.limit < current_table.len() - 1 or try current_table.fetchNext()) {
                     current_table.selected += Table.limit;
                     if (current_table.selected - current_table.start >= current_table.displayed()) {
                         current_table.start += Table.limit;
@@ -161,9 +155,7 @@ fn loop() !void {
                     }
                     try render();
                 }
-            } else if (in.eqlDescription("u") or in.eqlDescription("C-u") or
-                in.eqlDescription("page-up"))
-            {
+            } else if (in.eqlDescription("u") or in.eqlDescription("C-u") or in.eqlDescription("page-up")) {
                 if (current_table.selected > 0) {
                     current_table.selected -|= Table.limit;
                     if (current_table.selected < current_table.start) {
@@ -178,40 +170,17 @@ fn loop() !void {
                     try notify(.err, "Failed to start playback: {}", .{err});
                 }
             } else if (in.eqlDescription("p")) {
-                current_table.play() catch |err| {
+                if (current_table.play()) {
+                    try notifyAction("Playing");
+                } else |err| {
                     try notify(.err, "Failed to start playback: {}", .{err});
-                };
+                }
             } else if (in.eqlDescription("s")) {
                 try current_table.save(); // rename like command to save?
-                switch (current_table.selectedItem()) {
-                    .track => |track| try notify(.info, "Saved track '{s}' from '{s}' by {s}", .{
-                        track.name,
-                        track.album.name,
-                        track.artists[0].name,
-                    }),
-                    .album => |album| try notify(.info, "Saved album '{s}' by {s}", .{
-                        album.name,
-                        album.artists[0].name,
-                    }),
-                    .artist => |artist| try notify(.info, "Saved artist '{s}'", .{
-                        artist.name,
-                    }),
-                    .playlist => |playlist| try notify(.info, "Saved playlist '{s}' by {s}", .{
-                        playlist.name,
-                        playlist.owner.display_name orelse playlist.owner.id,
-                    }),
-                }
+                try notifyAction("Saved");
             } else if (in.eqlDescription("r")) {
-                // TODO: do it in 's'? (no)
-                // try current_table.remove(); // TODO: + add remove command
-            } else if (in.eqlDescription("-") or in.eqlDescription("_")) {
-                updateVolume(current_table.client, .down) catch |err| {
-                    try notify(.err, "Failed to update volume: {}", .{err});
-                };
-            } else if (in.eqlDescription("+") or in.eqlDescription("=")) {
-                updateVolume(current_table.client, .up) catch |err| {
-                    try notify(.err, "Failed to update volume: {}", .{err});
-                };
+                try current_table.remove(); // add remove command?
+                try notifyAction("Removed");
             } else if (in.eqlDescription("/")) {
                 // TODO: search and reset
                 // ask for kind and query
@@ -262,23 +231,11 @@ fn drawFooter(rc: *spoon.Term.RenderContext) !void {
     try rc.moveCursorTo(ui.term.height - 1, 0);
     try rc.setAttribute(.{ .fg = .none, .bg = .cyan });
     rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().writeAll("[q] Quit [h] Back [j] Down [k] Up [l] Forward [g] Top [G] Bottom [s] Save [p] Play [enter] Play and Quit");
+    try rpw.writer().writeAll("[q] Quit [h] Back [j] Down [k] Up [l] Forward [g] Top [G] Bottom [s] Save [r] Remove [p] Play [enter] Play and Quit");
     try rpw.pad();
 }
 
-const Level = enum {
-    err,
-    info,
-
-    pub fn asText(comptime self: Level) []const u8 {
-        return switch (self) {
-            .err => "error",
-            .info => "info",
-        };
-    }
-};
-
-fn notify(comptime level: Level, comptime fmt: []const u8, args: anytype) !void {
+fn notify(level: enum { err, info }, comptime fmt: []const u8, args: anytype) !void {
     var rc = try ui.term.getRenderContext();
     defer rc.done() catch {};
 
@@ -286,11 +243,31 @@ fn notify(comptime level: Level, comptime fmt: []const u8, args: anytype) !void 
     var rpw = rc.restrictedPaddingWriter(ui.term.width);
     switch (level) {
         .err => try rc.setAttribute(.{ .fg = .none, .bg = .red, .bold = true }),
-        .info => try rc.setAttribute(.{ .fg = .none, .bg = .green, .bold = true }),
+        .info => try rc.setAttribute(.{ .fg = .none, .bg = .blue, .bold = true }),
     }
-    const level_txt = comptime level.asText();
-    try rpw.writer().print(level_txt ++ ": " ++ fmt, args);
+    try rpw.writer().print(fmt, args);
     try rpw.pad();
+}
+
+fn notifyAction(comptime action: []const u8) !void {
+    switch (current_table.selectedItem()) {
+        .track => |track| try notify(.info, action ++ " track '{s}' from '{s}' by {s}", .{
+            track.name,
+            track.album.name,
+            track.artists[0].name,
+        }),
+        .album => |album| try notify(.info, action ++ " album '{s}' by {s}", .{
+            album.name,
+            album.artists[0].name,
+        }),
+        .artist => |artist| try notify(.info, action ++ " artist '{s}'", .{
+            artist.name,
+        }),
+        .playlist => |playlist| try notify(.info, action ++ " playlist '{s}' by {s}", .{
+            playlist.name,
+            playlist.owner.display_name orelse playlist.owner.id,
+        }),
+    }
 }
 
 fn handleSigWinch(_: c_int) callconv(.C) void {
@@ -336,21 +313,4 @@ fn fetchPlaylists(self: *Table) !void {
     try self.list.playlists.appendSlice(self.allocator, result.playlists.?.items);
     self.total = result.playlists.?.total;
     self.has_next = result.playlists.?.next != null;
-}
-
-fn updateVolume(client: *api.Client, arg: enum { up, down }) !void {
-    const playback_state = try api.getPlaybackState(client);
-    const device = playback_state.device orelse return error.NoActiveDevice;
-    var volume = device.volume_percent orelse return error.VolumeControlNotSupported;
-
-    if (arg == .up) {
-        volume += 10;
-        if (volume > 100) {
-            volume = 100;
-        }
-    } else if (arg == .down) {
-        volume -|= 10;
-    }
-
-    try api.setVolume(client, volume);
 }

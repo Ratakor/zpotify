@@ -450,11 +450,25 @@ pub fn saveAlbums(client: *Client, ids: []const u8) !void {
     return client.sendRequest(void, .PUT, url, "");
 }
 
-/// https://developer.spotify.com/documentation/web-api/reference/follow-artists-users
-pub fn followArtist(client: *Client, id: []const u8) !void {
+/// https://developer.spotify.com/documentation/web-api/reference/remove-albums-user
+pub fn removeAlbums(client: *Client, ids: []const u8) !void {
     var buf: [4096]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&ids={s}", .{id});
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/albums?ids={s}", .{ids});
+    return client.sendRequest(void, .DELETE, url, null);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/follow-artists-users
+pub fn followArtists(client: *Client, ids: []const u8) !void {
+    var buf: [4096]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&ids={s}", .{ids});
     return client.sendRequest(void, .PUT, url, "");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/unfollow-artists-users
+pub fn unfollowArtists(client: *Client, ids: []const u8) !void {
+    var buf: [4096]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&ids={s}", .{ids});
+    return client.sendRequest(void, .DELETE, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/follow-playlist
@@ -462,6 +476,13 @@ pub fn followPlaylist(client: *Client, id: []const u8) !void {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(&buf, api_url ++ "/playlists/{s}/followers", .{id});
     return client.sendRequest(void, .PUT, url, "{\"public\":false}");
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/unfollow-playlist
+pub fn unfollowPlaylist(client: *Client, id: []const u8) !void {
+    var buf: [128]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api_url ++ "/playlists/{s}/followers", .{id});
+    return client.sendRequest(void, .DELETE, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-an-artist
