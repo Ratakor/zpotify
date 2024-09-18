@@ -5,8 +5,6 @@ const ui = @import("../ui.zig");
 const help = @import("../cmd.zig").help;
 const Table = ui.Table;
 
-// this is allocation fest
-
 pub const usage =
     \\Usage: {s} search [track|artist|album|playlist] [query]...
     \\
@@ -23,6 +21,7 @@ pub const usage =
     \\  G or end                           Move to the bottom of the table
     \\  d or C-d or page-down              Move down one page
     \\  u or C-u or page-up                Move up one page
+    \\  i                                  Toggle image display
     \\  s                                  Save the selected entry to the library
     \\  r                                  Remove the selected entry from the library
     // \\  /                                  Search
@@ -51,6 +50,7 @@ pub fn exec(
         std.process.exit(1);
     };
 
+    // this is allocation fest
     var arena = std.heap.ArenaAllocator.init(child_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -163,6 +163,9 @@ fn loop() !void {
                     }
                     try render();
                 }
+            } else if (in.eqlDescription("i")) {
+                ui.enable_image = !ui.enable_image;
+                try render();
             } else if (in.eqlDescription("enter")) {
                 if (playFallback()) {
                     return;

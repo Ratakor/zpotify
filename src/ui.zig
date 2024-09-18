@@ -10,6 +10,7 @@ const c = @cImport({
 });
 
 pub var term: spoon.Term = undefined;
+pub var enable_image = true;
 var term_info: *c.ChafaTermInfo = undefined;
 var chafa_config: *c.ChafaCanvasConfig = undefined;
 
@@ -117,6 +118,7 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
         defer client.deinit();
         var response = std.ArrayList(u8).init(allocator);
         defer response.deinit();
+        // TODO: this is a big bottleneck
         const result = try client.fetch(.{
             .method = .GET,
             .location = .{ .url = url },
@@ -488,11 +490,13 @@ pub const Table = struct {
             .tracks => |list| list.items[self.selected].album.images,
             inline else => |list| list.items[self.selected].images,
         };
+        // const perfect_size = term.width_pixels * 20 / 100;
         return switch (images.len) {
             0 => null,
             1 => images[0].url,
             else => blk: {
-                // TODO: pick the best one based on the terminal size
+                // we should pick the best one based on the terminal size but
+                // this is faster (lol) and it's the best one in most cases
                 break :blk images[1].url;
             },
         };
@@ -539,9 +543,6 @@ fn makeDrawFn(
         std.debug.assert(size == 100);
     }
 
-    // 80% for headers, 20% for image or 100% for headers
-    const width_divider = if (hasImage) 125 else 100;
-
     return struct {
         fn draw(
             items: []const T,
@@ -557,7 +558,11 @@ fn makeDrawFn(
             const sel_row = selected_row + row - first_row;
             try drawEntries(items, rc, row, sel_row);
 
-            if (hasImage) {
+            if (comptime !hasImage) {
+                return;
+            }
+
+            if (enable_image) {
                 const col = term.width * 80 / 100 - 1;
                 const size = term.width * 20 / 100 + 2;
                 if (image_url) |url| {
@@ -592,6 +597,7 @@ fn makeDrawFn(
             try rpw.finish();
 
             var pos: usize = 0;
+            const width_divider = widthDivider();
             inline for (columns) |col| {
                 try rc.moveCursorTo(row + 1, pos);
                 const size = term.width * col.size / width_divider;
@@ -600,12 +606,14 @@ fn makeDrawFn(
                 pos += size;
             }
 
-            if (hasImage) {
-                try rc.moveCursorTo(row + 1, pos);
-                const size = term.width * 20 / 100;
-                rpw = rc.restrictedPaddingWriter(size);
-                try writer.writeAll("Image");
-                try rpw.finish();
+            if (comptime hasImage) {
+                if (enable_image) {
+                    try rc.moveCursorTo(row + 1, pos);
+                    const size = term.width * 20 / 100;
+                    rpw = rc.restrictedPaddingWriter(size);
+                    try writer.writeAll("Image");
+                    try rpw.finish();
+                }
             }
 
             return 2;
@@ -617,6 +625,7 @@ fn makeDrawFn(
             first_row: usize,
             selected_row: usize,
         ) !void {
+            const width_divider = widthDivider();
             for (items, first_row..) |item, row| {
                 try rc.moveCursorTo(row, 0);
                 var rpw = rc.restrictedPaddingWriter(term.width);
@@ -694,6 +703,14 @@ fn makeDrawFn(
                 try rc.moveCursorTo(x, y);
                 try rc.buffer.writer().writeAll(line);
             }
+        }
+
+        fn widthDivider() usize {
+            if (comptime !hasImage) {
+                return 100;
+            }
+            // 80% for headers, 20% for image or 100% for headers
+            return if (enable_image) 125 else 100;
         }
     }.draw;
 }

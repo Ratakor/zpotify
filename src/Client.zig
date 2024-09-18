@@ -25,17 +25,18 @@ pub fn init(
     http_client_allocator: std.mem.Allocator,
     arena_child_allocator: std.mem.Allocator,
 ) !Client {
+    var buffer: [4096]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buffer);
     var arena = std.heap.ArenaAllocator.init(arena_child_allocator);
-    const allocator = arena.allocator(); // TODO: use an fba for temporary allocations
 
-    const save_path = try getSavePath(allocator);
-    defer allocator.free(save_path);
+    const save_path = try getSavePath(fba.allocator());
+    defer fba.allocator().free(save_path);
     const cwd = std.fs.cwd();
     const save_file = if (cwd.openFile(save_path, .{ .mode = .read_write })) |save_file| blk: {
         defer save_file.close();
-        var json_reader = std.json.reader(allocator, save_file.reader());
+        var json_reader = std.json.reader(fba.allocator(), save_file.reader());
         defer json_reader.deinit();
-        if (std.json.parseFromTokenSourceLeaky(Save, allocator, &json_reader, .{})) |save_json| {
+        if (std.json.parseFromTokenSourceLeaky(Save, arena.allocator(), &json_reader, .{})) |save_json| {
             return .{
                 .basic_auth = save_json.basic_auth,
                 .refresh_token = save_json.refresh_token,
@@ -64,23 +65,23 @@ pub fn init(
     try stdout.writeAll("Go to https://developer.spotify.com/dashboard.\n");
     try stdout.writeAll("Create a new app, name and description doesn't matter but redirect URI must be '" ++ redirect_uri ++ "'.\n");
     try stdout.writeAll("Enter the following informations:\n");
-    const client_id = try getClientData("ID", allocator);
-    defer allocator.free(client_id);
-    const client_secret = try getClientData("Secret", allocator);
-    defer allocator.free(client_secret);
+    const client_id = try getClientData("ID", fba.allocator());
+    defer fba.allocator().free(client_id);
+    const client_secret = try getClientData("Secret", fba.allocator());
+    defer fba.allocator().free(client_secret);
 
-    const auth_code = try oauth2(allocator, client_id);
-    defer allocator.free(auth_code);
+    const auth_code = try oauth2(fba.allocator(), client_id);
+    defer fba.allocator().free(auth_code);
 
     const basic_auth = blk: {
-        var buffer: [32 + 1 + 32]u8 = undefined;
-        const source = try std.fmt.bufPrint(&buffer, "{s}:{s}", .{ client_id, client_secret });
+        var buf: [32 + 1 + 32]u8 = undefined;
+        const source = try std.fmt.bufPrint(&buf, "{s}:{s}", .{ client_id, client_secret });
         var base64 = std.base64.standard.Encoder;
         const size = base64.calcSize(source.len);
-        const dest = try allocator.alloc(u8, size);
+        const dest = try arena.allocator().alloc(u8, size);
         break :blk base64.encode(dest, source);
     };
-    errdefer allocator.free(basic_auth);
+    errdefer arena.allocator().free(basic_auth);
 
     var client: Client = .{
         .basic_auth = basic_auth,
@@ -91,11 +92,11 @@ pub fn init(
         .arena = arena,
     };
     const body = try std.fmt.allocPrint(
-        allocator,
+        fba.allocator(),
         "grant_type=authorization_code&code={s}&redirect_uri=" ++ redirect_uri,
         .{auth_code},
     );
-    defer allocator.free(body);
+    defer fba.allocator().free(body);
     client.refresh_token = (try client.getToken(body)).?;
 
     try client.updateSaveFile(save_file);
