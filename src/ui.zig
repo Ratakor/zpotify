@@ -79,6 +79,7 @@ const JpegErrorManager = extern struct {
         const ptr: [*c]u8 = @ptrCast(&buffer);
         self.mgr.format_message.?(cinfo, ptr);
         const len = std.mem.len(ptr);
+        // std.log.err("{s}", .{ptr[0..len]});
         std.log.debug("jpeglib: {s}", .{ptr[0..len]});
     }
 };
@@ -348,31 +349,31 @@ pub const Table = struct {
         switch (self.list) {
             .tracks => |list| try drawTracks(
                 list.items[start..end],
-                self.imageUrl(),
                 rc,
                 first_row,
                 selected_row,
+                self.imageUrl(),
             ),
             .artists => |list| try drawArtists(
                 list.items[start..end],
-                self.imageUrl(),
                 rc,
                 first_row,
                 selected_row,
+                self.imageUrl(),
             ),
             .albums => |list| try drawAlbums(
                 list.items[start..end],
-                self.imageUrl(),
                 rc,
                 first_row,
                 selected_row,
+                self.imageUrl(),
             ),
             .playlists => |list| try drawPlaylists(
                 list.items[start..end],
-                self.imageUrl(),
                 rc,
                 first_row,
                 selected_row,
+                self.imageUrl(),
             ),
         }
     }
@@ -451,15 +452,15 @@ pub const Table = struct {
         }
     }
 
-    pub fn play(self: Table) !void {
+    pub fn play(self: Table, device_id: ?[]const u8) !void {
         switch (self.list) {
             .tracks => |list| {
                 const uris = [_][]const u8{list.items[self.selected].uri};
-                try api.startPlayback(self.client, .{ .uris = &uris }, null);
+                try api.startPlayback(self.client, .{ .uris = &uris }, device_id);
             },
             inline else => |list| {
                 const uri = list.items[self.selected].uri;
-                try api.startPlayback(self.client, .{ .context_uri = uri }, null);
+                try api.startPlayback(self.client, .{ .context_uri = uri }, device_id);
             },
         }
     }
@@ -511,292 +512,336 @@ pub const Table = struct {
             .playlists => |list| return .{ .playlist = &list.items[self.selected] },
         }
     }
+};
 
-    const Column = struct {
-        header_name: []const u8,
-        field: @Type(.EnumLiteral),
-        size: usize, // in %
-    };
+const Column = struct {
+    header_name: []const u8,
+    field: @Type(.EnumLiteral),
+    size: usize, // in %
+};
 
-    fn makeDrawFn(
-        comptime T: type,
-        comptime title: []const u8,
-        comptime columns: []const Column,
-        comptime writeField: fn (
-            comptime field: @Type(.EnumLiteral),
-            item: T,
-            writer: anytype,
-        ) anyerror!void,
-    ) fn ([]const T, ?[]const u8, *spoon.Term.RenderContext, usize, usize) anyerror!void {
-        comptime {
-            var size = 0;
-            for (columns) |col| {
-                size += col.size;
+fn makeDrawFn(
+    comptime T: type,
+    comptime title: []const u8,
+    comptime columns: []const Column,
+    comptime writeField: fn (
+        comptime field: @Type(.EnumLiteral),
+        item: T,
+        writer: anytype,
+    ) anyerror!void,
+    comptime hasImage: bool,
+) fn ([]const T, *spoon.Term.RenderContext, usize, usize, if (hasImage) ?[]const u8 else void) anyerror!void {
+    comptime {
+        var size = 0;
+        for (columns) |col| {
+            size += col.size;
+        }
+        std.debug.assert(size == 100);
+    }
+
+    // 80% for headers, 20% for image or 100% for headers
+    const width_divider = if (hasImage) 125 else 100;
+
+    return struct {
+        fn draw(
+            items: []const T,
+            rc: *spoon.Term.RenderContext,
+            first_row: usize,
+            selected_row: usize,
+            image_url: if (hasImage) ?[]const u8 else void,
+        ) !void {
+            var row: usize = first_row;
+
+            row += try drawHeaders(rc, row);
+
+            const sel_row = selected_row + row - first_row;
+            try drawEntries(items, rc, row, sel_row);
+
+            if (hasImage) {
+                const col = term.width * 80 / 100 - 1;
+                const size = term.width * 20 / 100 + 2;
+                if (image_url) |url| {
+                    if (drawImage(rc, url, row, col, size)) {
+                        return;
+                    } else |err| switch (err) {
+                        error.FailedToReadImage => {}, // write "No image"
+                        error.UnsupportedImageFormat => {}, // write "No image"
+                        else => return err,
+                    }
+                }
+
+                try rc.moveCursorTo(row, col);
+                var rpw = rc.restrictedPaddingWriter(size);
+                if (row == sel_row) {
+                    try rc.setAttribute(.{ .reverse = true, .fg = .none });
+                } else {
+                    try rc.setAttribute(.{ .fg = .none });
+                }
+                try rpw.writer().writeAll("No image");
+                try rpw.finish();
             }
-            std.debug.assert(size == 100);
         }
 
-        return struct {
-            // TODO: move back to separate functions (again)
-            fn draw(
-                items: []const T,
-                image_url: ?[]const u8,
-                rc: *spoon.Term.RenderContext,
-                first_row: usize,
-                selected_row: usize,
-            ) !void {
-                var row: usize = first_row;
+        fn drawHeaders(rc: *spoon.Term.RenderContext, row: usize) !usize {
+            try rc.setAttribute(.{ .fg = .none, .bold = true });
 
-                // title row
-                try rc.setAttribute(.{ .fg = .none, .bold = true });
+            try rc.moveCursorTo(row, 0);
+            var rpw = rc.restrictedPaddingWriter(term.width);
+            const writer = rpw.writer();
+            try writer.writeAll(title);
+            try rpw.finish();
+
+            var pos: usize = 0;
+            inline for (columns) |col| {
+                try rc.moveCursorTo(row + 1, pos);
+                const size = term.width * col.size / width_divider;
+                rpw.len_left = size - 1;
+                try writer.writeAll(col.header_name);
+                pos += size;
+            }
+
+            if (hasImage) {
+                try rc.moveCursorTo(row + 1, pos);
+                const size = term.width * 20 / 100;
+                rpw = rc.restrictedPaddingWriter(size);
+                try writer.writeAll("Image");
+                try rpw.finish();
+            }
+
+            return 2;
+        }
+
+        fn drawEntries(
+            items: []const T,
+            rc: *spoon.Term.RenderContext,
+            first_row: usize,
+            selected_row: usize,
+        ) !void {
+            for (items, first_row..) |item, row| {
                 try rc.moveCursorTo(row, 0);
                 var rpw = rc.restrictedPaddingWriter(term.width);
                 const writer = rpw.writer();
-                try writer.writeAll(title);
-                try rpw.finish();
-                row += 1;
 
-                // headers row
+                if (row == selected_row) {
+                    try rc.setAttribute(.{ .reverse = true, .fg = .none });
+                    try rpw.pad();
+                } else {
+                    try rc.setAttribute(.{ .fg = .none });
+                }
+
                 var pos: usize = 0;
                 inline for (columns) |col| {
                     try rc.moveCursorTo(row, pos);
-                    const size = term.width * col.size / 125; // 80% for headers, 20% for image
-                    rpw = rc.restrictedPaddingWriter(size - 1);
-                    try writer.writeAll(col.header_name);
+                    const size = term.width * col.size / width_divider;
+                    rpw.len_left = size - 1;
+                    try writeField(col.field, item, writer);
                     pos += size;
-                }
-                {
-                    try rc.moveCursorTo(row, pos);
-                    const size = term.width * 20 / 100;
-                    rpw = rc.restrictedPaddingWriter(size);
-                    try writer.writeAll("Image");
-                    try rpw.finish();
-                }
-                row += 1;
-
-                // items rows
-                const sel_row = selected_row + row - first_row;
-                for (items, row..) |item, x| {
-                    try rc.moveCursorTo(x, 0);
-                    rpw = rc.restrictedPaddingWriter(term.width);
-
-                    if (x == sel_row) {
-                        try rc.setAttribute(.{ .reverse = true, .fg = .none });
-                        try rpw.pad();
-                    } else {
-                        try rc.setAttribute(.{ .fg = .none });
-                    }
-
-                    var y: usize = 0;
-                    inline for (columns) |col| {
-                        try rc.moveCursorTo(x, y);
-                        const size = term.width * col.size / 125; // same as above
-                        rpw = rc.restrictedPaddingWriter(size - 1);
-                        try writeField(col.field, item, writer);
-                        y += size;
-                        try rpw.finish();
-                    }
-                }
-
-                // selected item image
-                {
-                    const col = term.width * 80 / 100 - 1;
-                    const size = term.width * 20 / 100 + 2;
-                    if (image_url) |url| {
-                        if (drawImage(rc, url, row, col, size)) {
-                            return;
-                        } else |err| switch (err) {
-                            error.FailedToReadImage => {}, // write "No image"
-                            error.UnsupportedImageFormat => {}, // write "No image"
-                            else => return err,
-                        }
-                    }
-
-                    try rc.moveCursorTo(row, col);
-                    rpw = rc.restrictedPaddingWriter(size);
-                    if (row == sel_row) {
-                        try rc.setAttribute(.{ .reverse = true, .fg = .none });
-                    } else {
-                        try rc.setAttribute(.{ .fg = .none });
-                    }
-                    try writer.writeAll("No image");
                     try rpw.finish();
                 }
             }
+        }
 
-            fn drawImage(
-                rc: *spoon.Term.RenderContext,
-                url: []const u8,
-                start_x: usize,
-                y: usize,
-                size: usize,
-            ) !void {
-                // TODO: allocator
-                var image = try fetchImage(std.heap.c_allocator, url);
-                defer image.deinit();
+        fn drawImage(
+            rc: *spoon.Term.RenderContext,
+            url: []const u8,
+            start_x: usize,
+            y: usize,
+            size: usize,
+        ) !void {
+            // TODO: allocator
+            var image = try fetchImage(std.heap.c_allocator, url);
+            defer image.deinit();
 
-                const cell_width = term.width_pixels / term.width;
-                const cell_height = term.height_pixels / term.height;
-                const font_ratio = @as(f64, @floatFromInt(cell_width)) / @as(f64, @floatFromInt(cell_height));
-                var w: c.gint = @intCast(size);
-                var h: c.gint = @intCast(size);
-                c.chafa_calc_canvas_geometry(
-                    @intCast(image.width),
-                    @intCast(image.height),
-                    &w,
-                    &h,
-                    @floatCast(font_ratio),
-                    @intFromBool(false),
-                    @intFromBool(false),
-                );
+            const cell_width = term.width_pixels / term.width;
+            const cell_height = term.height_pixels / term.height;
+            const font_ratio = @as(f64, @floatFromInt(cell_width)) / @as(f64, @floatFromInt(cell_height));
+            var w: c.gint = @intCast(size);
+            var h: c.gint = @intCast(size);
+            c.chafa_calc_canvas_geometry(
+                @intCast(image.width),
+                @intCast(image.height),
+                &w,
+                &h,
+                @floatCast(font_ratio),
+                @intFromBool(false),
+                @intFromBool(false),
+            );
 
-                c.chafa_canvas_config_set_cell_geometry(
-                    chafa_config,
-                    @intCast(cell_width),
-                    @intCast(cell_height),
-                );
-                c.chafa_canvas_config_set_geometry(chafa_config, w, h);
+            c.chafa_canvas_config_set_cell_geometry(
+                chafa_config,
+                @intCast(cell_width),
+                @intCast(cell_height),
+            );
+            c.chafa_canvas_config_set_geometry(chafa_config, w, h);
 
-                const canvas = c.chafa_canvas_new(chafa_config).?;
-                defer c.chafa_canvas_unref(canvas);
+            const canvas = c.chafa_canvas_new(chafa_config).?;
+            defer c.chafa_canvas_unref(canvas);
 
-                c.chafa_canvas_draw_all_pixels(
-                    canvas,
-                    c.CHAFA_PIXEL_RGB8,
-                    image.pixels.ptr,
-                    @intCast(image.width),
-                    @intCast(image.height),
-                    @intCast(image.width * Image.channel_count),
-                );
-                const gs = c.chafa_canvas_print(canvas, term_info);
-                defer _ = c.g_string_free(gs, @intFromBool(true));
+            c.chafa_canvas_draw_all_pixels(
+                canvas,
+                c.CHAFA_PIXEL_RGB8,
+                image.pixels.ptr,
+                @intCast(image.width),
+                @intCast(image.height),
+                @intCast(image.width * Image.channel_count),
+            );
+            const gs = c.chafa_canvas_print(canvas, term_info);
+            defer _ = c.g_string_free(gs, @intFromBool(true));
 
-                var iter = std.mem.tokenizeScalar(u8, gs.*.str[0..gs.*.len], '\n');
-                var x: usize = start_x;
-                while (iter.next()) |line| : (x += 1) {
-                    try rc.moveCursorTo(x, y);
-                    try rc.buffer.writer().writeAll(line);
-                }
+            var iter = std.mem.tokenizeScalar(u8, gs.*.str[0..gs.*.len], '\n');
+            var x: usize = start_x;
+            while (iter.next()) |line| : (x += 1) {
+                try rc.moveCursorTo(x, y);
+                try rc.buffer.writer().writeAll(line);
             }
-        }.draw;
-    }
+        }
+    }.draw;
+}
 
-    const drawTracks = makeDrawFn(
-        api.Track,
-        "Tracks",
-        &[_]Column{
-            .{ .header_name = "Name", .field = .name, .size = 40 },
-            .{ .header_name = "Album", .field = .album, .size = 20 },
-            .{ .header_name = "Artists", .field = .artists, .size = 30 },
-            .{ .header_name = "Duration", .field = .duration_ms, .size = 10 },
-        },
-        struct {
-            fn writeField(
-                comptime field: @Type(.EnumLiteral),
-                item: api.Track,
-                writer: anytype,
-            ) anyerror!void {
-                switch (field) {
-                    .album => try writer.writeAll(item.album.name),
-                    .artists => {
-                        for (item.artists, 0..) |artist, i| {
-                            if (i != 0) {
-                                try writer.writeAll(", ");
-                            }
-                            try writer.writeAll(artist.name);
+const drawTracks = makeDrawFn(
+    api.Track,
+    "Tracks",
+    &[_]Column{
+        .{ .header_name = "Name", .field = .name, .size = 40 },
+        .{ .header_name = "Album", .field = .album, .size = 20 },
+        .{ .header_name = "Artists", .field = .artists, .size = 30 },
+        .{ .header_name = "Duration", .field = .duration_ms, .size = 10 },
+    },
+    struct {
+        fn writeField(
+            comptime field: @Type(.EnumLiteral),
+            item: api.Track,
+            writer: anytype,
+        ) anyerror!void {
+            switch (field) {
+                .album => try writer.writeAll(item.album.name),
+                .artists => {
+                    for (item.artists, 0..) |artist, i| {
+                        if (i != 0) {
+                            try writer.writeAll(", ");
                         }
-                    },
-                    .duration_ms => {
-                        const min = item.duration_ms / std.time.ms_per_min;
-                        const sec = (item.duration_ms / std.time.ms_per_s) % std.time.s_per_min;
-                        try writer.print("{d}:{d:0>2}", .{ min, sec });
-                    },
-                    else => try writer.writeAll(@field(item, @tagName(field))),
-                }
+                        try writer.writeAll(artist.name);
+                    }
+                },
+                .duration_ms => {
+                    const min = item.duration_ms / std.time.ms_per_min;
+                    const sec = (item.duration_ms / std.time.ms_per_s) % std.time.s_per_min;
+                    try writer.print("{d}:{d:0>2}", .{ min, sec });
+                },
+                else => try writer.writeAll(@field(item, @tagName(field))),
             }
-        }.writeField,
-    );
+        }
+    }.writeField,
+    true,
+);
 
-    const drawArtists = makeDrawFn(
-        api.Artist,
-        "Artists",
-        &[_]Column{
-            .{ .header_name = "Name", .field = .name, .size = 30 },
-            .{ .header_name = "Genres", .field = .genres, .size = 55 },
-            .{ .header_name = "Followers", .field = .followers, .size = 15 },
-        },
-        struct {
-            fn writeField(
-                comptime field: @Type(.EnumLiteral),
-                item: api.Artist,
-                writer: anytype,
-            ) anyerror!void {
-                switch (field) {
-                    .genres => {
-                        for (item.genres, 0..) |genre, i| {
-                            if (i != 0) {
-                                try writer.writeAll(", ");
-                            }
-                            try writer.writeAll(genre);
+const drawArtists = makeDrawFn(
+    api.Artist,
+    "Artists",
+    &[_]Column{
+        .{ .header_name = "Name", .field = .name, .size = 30 },
+        .{ .header_name = "Genres", .field = .genres, .size = 55 },
+        .{ .header_name = "Followers", .field = .followers, .size = 15 },
+    },
+    struct {
+        fn writeField(
+            comptime field: @Type(.EnumLiteral),
+            item: api.Artist,
+            writer: anytype,
+        ) anyerror!void {
+            switch (field) {
+                .genres => {
+                    for (item.genres, 0..) |genre, i| {
+                        if (i != 0) {
+                            try writer.writeAll(", ");
                         }
-                    },
-                    .followers => try writer.print("{d}", .{item.followers.total}),
-                    else => try writer.writeAll(@field(item, @tagName(field))),
-                }
+                        try writer.writeAll(genre);
+                    }
+                },
+                .followers => try writer.print("{d}", .{item.followers.total}),
+                else => try writer.writeAll(@field(item, @tagName(field))),
             }
-        }.writeField,
-    );
+        }
+    }.writeField,
+    true,
+);
 
-    const drawAlbums = makeDrawFn(
-        api.Album,
-        "Albums",
-        &[_]Column{
-            .{ .header_name = "Name", .field = .name, .size = 40 },
-            .{ .header_name = "Artists", .field = .artists, .size = 40 },
-            .{ .header_name = "Release Date", .field = .release_date, .size = 20 },
-        },
-        struct {
-            fn writeField(
-                comptime field: @Type(.EnumLiteral),
-                item: api.Album,
-                writer: anytype,
-            ) anyerror!void {
-                switch (field) {
-                    .artists => {
-                        for (item.artists, 0..) |artist, i| {
-                            if (i != 0) {
-                                try writer.writeAll(", ");
-                            }
-                            try writer.writeAll(artist.name);
+const drawAlbums = makeDrawFn(
+    api.Album,
+    "Albums",
+    &[_]Column{
+        .{ .header_name = "Name", .field = .name, .size = 40 },
+        .{ .header_name = "Artists", .field = .artists, .size = 40 },
+        .{ .header_name = "Release Date", .field = .release_date, .size = 20 },
+    },
+    struct {
+        fn writeField(
+            comptime field: @Type(.EnumLiteral),
+            item: api.Album,
+            writer: anytype,
+        ) anyerror!void {
+            switch (field) {
+                .artists => {
+                    for (item.artists, 0..) |artist, i| {
+                        if (i != 0) {
+                            try writer.writeAll(", ");
                         }
-                    },
-                    else => try writer.writeAll(@field(item, @tagName(field))),
-                }
+                        try writer.writeAll(artist.name);
+                    }
+                },
+                else => try writer.writeAll(@field(item, @tagName(field))),
             }
-        }.writeField,
-    );
+        }
+    }.writeField,
+    true,
+);
 
-    const drawPlaylists = makeDrawFn(
-        api.Playlist,
-        "Playlists",
-        &[_]Column{
-            .{ .header_name = "Name", .field = .name, .size = 30 },
-            .{ .header_name = "Description", .field = .description, .size = 50 },
-            .{ .header_name = "Owner", .field = .owner, .size = 15 },
-            .{ .header_name = "Tracks", .field = .tracks, .size = 5 },
-        },
-        struct {
-            fn writeField(
-                comptime field: @Type(.EnumLiteral),
-                item: api.Playlist,
-                writer: anytype,
-            ) anyerror!void {
-                switch (field) {
-                    .owner => try writer.print("{?s}", .{item.owner.display_name}),
-                    .tracks => try writer.print("{d}", .{item.tracks.total}),
-                    else => try writer.writeAll(@field(item, @tagName(field))),
-                }
+const drawPlaylists = makeDrawFn(
+    api.Playlist,
+    "Playlists",
+    &[_]Column{
+        .{ .header_name = "Name", .field = .name, .size = 30 },
+        .{ .header_name = "Description", .field = .description, .size = 50 },
+        .{ .header_name = "Owner", .field = .owner, .size = 15 },
+        .{ .header_name = "Tracks", .field = .tracks, .size = 5 },
+    },
+    struct {
+        fn writeField(
+            comptime field: @Type(.EnumLiteral),
+            item: api.Playlist,
+            writer: anytype,
+        ) anyerror!void {
+            switch (field) {
+                .owner => try writer.print("{?s}", .{item.owner.display_name}),
+                .tracks => try writer.print("{d}", .{item.tracks.total}),
+                else => try writer.writeAll(@field(item, @tagName(field))),
             }
-        }.writeField,
-    );
-};
+        }
+    }.writeField,
+    true,
+);
+
+pub const drawDevices = makeDrawFn(
+    api.Device,
+    "Devices",
+    &[_]Column{
+        .{ .header_name = "Name", .field = .name, .size = 40 },
+        .{ .header_name = "ID", .field = .id, .size = 40 },
+        .{ .header_name = "Type", .field = .type, .size = 10 },
+        .{ .header_name = "Volume", .field = .volume_percent, .size = 10 },
+    },
+    struct {
+        fn writeField(
+            comptime field: @Type(.EnumLiteral),
+            item: api.Device,
+            writer: anytype,
+        ) anyerror!void {
+            switch (field) {
+                .id => try writer.print("{?s}", .{item.id}),
+                .volume_percent => try writer.print("{?d}%", .{item.volume_percent}),
+                else => try writer.writeAll(@field(item, @tagName(field))),
+            }
+        }
+    }.writeField,
+    false,
+);

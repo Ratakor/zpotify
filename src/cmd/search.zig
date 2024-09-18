@@ -32,6 +32,7 @@ pub const usage =
 ;
 
 var current_table: *Table = undefined;
+var devices: struct { items: ?api.Devices, selected: usize } = .{ .items = null, .selected = 0 };
 
 pub fn exec(
     client: *api.Client,
@@ -81,12 +82,11 @@ pub fn exec(
 }
 
 fn loop() !void {
-    var fds: [1]std.posix.pollfd = undefined;
-    fds[0] = .{
+    var fds = [1]std.posix.pollfd{.{
         .fd = ui.term.tty.?,
         .events = std.posix.POLL.IN,
         .revents = undefined,
-    };
+    }};
     var buf: [48]u8 = undefined; // must be a multiple of 6
     while (true) {
         _ = try std.posix.poll(&fds, -1);
@@ -129,7 +129,7 @@ fn loop() !void {
                     current_table = next_table;
                     current_table.resetPosition();
                     try render();
-                } else if (current_table.play()) { // current_table is a track -> play it
+                } else if (playFallback()) { // current_table is a track -> play it
                     try notifyAction("Playing");
                 } else |err| {
                     try notify(.err, "Failed to start playback: {}", .{err});
@@ -164,13 +164,13 @@ fn loop() !void {
                     try render();
                 }
             } else if (in.eqlDescription("enter")) {
-                if (current_table.play()) {
+                if (playFallback()) {
                     return;
                 } else |err| {
                     try notify(.err, "Failed to start playback: {}", .{err});
                 }
             } else if (in.eqlDescription("p")) {
-                if (current_table.play()) {
+                if (playFallback()) {
                     try notifyAction("Playing");
                 } else |err| {
                     try notify(.err, "Failed to start playback: {}", .{err});
@@ -204,34 +204,45 @@ fn render() !void {
         return;
     }
 
-    try drawHeader(&rc);
-    try current_table.draw(&rc, 1);
-    try drawFooter(&rc);
+    if (devices.items) |items| {
+        try drawHeader(&rc, "zpotify: Select a device to play on");
+        try ui.drawDevices(items, &rc, 1, devices.selected + 1, {});
+        try drawFooter(&rc, "[q] Back [j] Down [k] Up [enter] Select");
+    } else {
+        try drawHeader(&rc, current_table.title);
+        try current_table.draw(&rc, 1);
+        try drawFooter(&rc, "[q] Quit [h] Back [j] Down [k] Up [l] Forward [g] Top [G] Bottom [s] Save [r] Remove [p] Play [enter] Play and Quit");
+    }
 }
 
-fn drawHeader(rc: *spoon.Term.RenderContext) !void {
+fn drawHeader(rc: *spoon.Term.RenderContext, header: []const u8) !void {
     try rc.moveCursorTo(0, 0);
     try rc.setAttribute(.{ .fg = .green, .reverse = true, .bold = true });
     var rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().writeAll(current_table.title);
+    try rpw.writer().writeAll(header);
     try rpw.pad();
 }
 
-fn drawFooter(rc: *spoon.Term.RenderContext) !void {
+fn drawFooter(rc: *spoon.Term.RenderContext, footer: []const u8) !void {
     try rc.moveCursorTo(ui.term.height - 2, 0);
     try rc.setAttribute(.{ .fg = .none, .bold = true });
     var rpw = rc.restrictedPaddingWriter(ui.term.width);
-    const kind = @tagName(current_table.list);
-    try rpw.writer().print("Showing {d} of {d} {s}", .{
-        current_table.len(),
-        current_table.total,
-        kind[0 .. kind.len - @intFromBool(current_table.len() == 1)],
-    });
-    try rpw.pad();
+    if (devices.items) |items| {
+        try rpw.writer().print("Showing {0d} of {0d} devices", .{items.len});
+    } else {
+        const kind = @tagName(current_table.list);
+        try rpw.writer().print("Showing {d} of {d} {s}", .{
+            current_table.len(),
+            current_table.total,
+            kind[0 .. kind.len - @intFromBool(current_table.len() == 1)],
+        });
+    }
+    try rpw.finish();
+
     try rc.moveCursorTo(ui.term.height - 1, 0);
     try rc.setAttribute(.{ .fg = .none, .bg = .cyan });
     rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().writeAll("[q] Quit [h] Back [j] Down [k] Up [l] Forward [g] Top [G] Bottom [s] Save [r] Remove [p] Play [enter] Play and Quit");
+    try rpw.writer().writeAll(footer);
     try rpw.pad();
 }
 
@@ -267,6 +278,58 @@ fn notifyAction(comptime action: []const u8) !void {
             playlist.name,
             playlist.owner.display_name orelse playlist.owner.id,
         }),
+    }
+}
+
+fn playFallback() !void {
+    if (current_table.play(null)) {
+        return;
+    } else |err| {
+        if (err != error.NoActiveDevice) {
+            return err;
+        }
+
+        devices.items = try api.getDevices(current_table.client); // this will be freed at the end of the PROGRAM
+        devices.selected = 0;
+        defer {
+            devices.items = null;
+            render() catch {};
+        }
+        if (devices.items.?.len == 0) {
+            return error.NoActiveDevice;
+        }
+
+        var fds = [1]std.posix.pollfd{.{
+            .fd = ui.term.tty.?,
+            .events = std.posix.POLL.IN,
+            .revents = undefined,
+        }};
+        var buf: [48]u8 = undefined; // must be a multiple of 6
+        try render();
+        while (true) {
+            _ = try std.posix.poll(&fds, -1);
+            const read = try ui.term.readInput(&buf);
+            var it = spoon.inputParser(buf[0..read]);
+            while (it.next()) |in| {
+                if (in.eqlDescription("q") or in.eqlDescription("h")) {
+                    return error.Canceled;
+                } else if (in.eqlDescription("arrow-down") or in.eqlDescription("j")) {
+                    if (devices.selected < devices.items.?.len - 1) {
+                        devices.selected += 1;
+                        try render();
+                    }
+                } else if (in.eqlDescription("arrow-up") or in.eqlDescription("k")) {
+                    if (devices.selected > 0) {
+                        devices.selected -= 1;
+                        try render();
+                    }
+                } else if (in.eqlDescription("enter") or in.eqlDescription("l")) {
+                    const device_id = devices.items.?[devices.selected].id;
+                    try current_table.play(device_id);
+                    return;
+                }
+            }
+        }
     }
 }
 
