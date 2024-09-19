@@ -298,8 +298,12 @@ fn playFallback() !void {
             devices.items = null;
             render() catch {};
         }
+
         if (devices.items.?.len == 0) {
             return error.NoActiveDevice;
+        } else if (devices.items.?.len == 1) {
+            try current_table.play(devices.items.?[0].id);
+            return;
         }
 
         var fds = [1]std.posix.pollfd{.{
