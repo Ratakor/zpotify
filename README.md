@@ -1,7 +1,7 @@
 # zpotify
 zpotify is a CLI for controlling Spotify playback and much more!
 
-https://github.com/user-attachments/assets/40e91cb7-a8a3-4eae-840f-b073221ce0c3
+https://github.com/user-attachments/assets/5a97453a-db8a-4689-b2d0-ab1f2009fcb0
 
 ## Installation
 
