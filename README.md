@@ -51,7 +51,7 @@ Commands:
 
 ## Performance
 
-2x times faster than the only good alternative [baton](https://github.com/joshuathompson/baton)!
+More than 2x times faster than the only good alternative [baton](https://github.com/joshuathompson/baton)!
 ```
 % cat run
 #!/bin/sh
@@ -89,5 +89,13 @@ Benchmark 2 (43 runs): ./run zpotify
 - [chafa](https://github.com/hpjansson/chafa)
 
 ## TODO
+- add `zpotify play liked` cmd which play liked songs
+- add a way to save track / album to a playlist
+- embed [librespot](https://github.com/librespot-org/librespot)
+  - need to create bindings
+  - use [build.crab](https://github.com/akarpovskii/build.crab) for build integration
+  - use [ziggy](https://github.com/kristoff-it/ziggy) for config
+  - librespot alternative?: [cspot](https://github.com/feelfreelinux/cspot)
+- add man page with [zzdoc](https://github.com/rockorager/zzdoc)
 - redo the perf analysis
 - add test coverage

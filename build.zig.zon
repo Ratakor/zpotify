@@ -3,7 +3,7 @@
     .version = "0.3.0",
     .minimum_zig_version = "0.13.0",
     .dependencies = .{
-        .@"zig-spoon" = .{ .path = "deps/zig-spoon" },
+        .@"zig-spoon" = .{ .path = "vendor/zig-spoon" },
     },
     .paths = .{""},
 }

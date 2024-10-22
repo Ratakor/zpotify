@@ -215,6 +215,8 @@ fn getItemFromMenu(
 }
 
 fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]const u8 {
+    const T = @typeInfo(@TypeOf(items)).Pointer.child;
+
     // pipe[0] = read, pipe[1] = write
     const p2c_pipe = try std.posix.pipe(); // parent -> child
     const c2p_pipe = try std.posix.pipe(); // child -> parent
@@ -235,19 +237,21 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
     std.posix.close(p2c_pipe[0]);
     std.posix.close(c2p_pipe[1]);
 
-    const writer = std.fs.File.writer(.{ .handle = p2c_pipe[1] });
+    var bw = std.io.bufferedWriter(std.fs.File.writer(.{ .handle = p2c_pipe[1] }));
+    const writer = bw.writer();
     for (items) |item| {
-        if (@hasField(@TypeOf(item), "track")) {
+        if (@hasField(T, "track")) {
             try writer.print("{s} - {s}\n", .{ item.track.artists[0].name, item.track.name });
-        } else if (@hasField(@TypeOf(item), "album")) {
+        } else if (@hasField(T, "album")) {
             try writer.print("{s} - {s}\n", .{ item.album.artists[0].name, item.album.name });
         } else {
             try writer.print("{s}\n", .{item.name});
         }
     }
-    if (@TypeOf(items[0]) != api.Device) {
+    if (T != api.Device) {
         try writer.writeAll("previous\nnext");
     }
+    try bw.flush();
     std.posix.close(p2c_pipe[1]);
 
     const wpr = std.posix.waitpid(fork_pid, 0);
