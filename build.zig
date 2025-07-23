@@ -5,6 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const spoon = b.dependency("zig-spoon", .{}).module("spoon");
+    const cova = b.dependency("cova", .{}).module("cova");
 
     const exe = b.addExecutable(.{
         .name = "zpotify",
@@ -13,6 +14,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addImport("spoon", spoon);
+    exe.root_module.addImport("cova", cova);
     exe.linkLibC();
     exe.linkSystemLibrary("chafa");
     exe.linkSystemLibrary("libjpeg");

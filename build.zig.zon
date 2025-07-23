@@ -3,7 +3,13 @@
     .version = "0.3.0",
     .minimum_zig_version = "0.13.0",
     .dependencies = .{
-        .@"zig-spoon" = .{ .path = "vendor/zig-spoon" },
+        .@"zig-spoon" = .{
+            .path = "vendor/zig-spoon",
+        },
+        .cova = .{
+            .url = "git+https://github.com/00JCIV00/cova#894173ad41095b216f6faabb161022ba5c072cf6",
+            .hash = "1220d4a694d9a8e0af2c6a829efdd6bb8a214f09167ab2d3608e458adc2333c36fbd",
+        },
     },
     .paths = .{""},
 }

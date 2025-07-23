@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const cova = @import("cova");
 const Client = @import("Client.zig");
 const cmd = @import("cmd.zig");
 
@@ -85,7 +86,41 @@ fn coloredLog(
     bw.flush() catch return;
 }
 
+const CommandT = cova.Command.Custom(.{});
+const zpotify = CommandT{
+    .name = "zpotify",
+    .sub_cmds = &.{
+        CommandT{
+            .name = "logout",
+            .description = "Remove the stored credentials from the config file",
+        },
+        CommandT{
+            .name = "help",
+            .description = "Display information about a command",
+            // .opts = &.{
+            //     cova.Arg.String("command", "The command to get help for"),
+            // },
+        },
+        CommandT{
+            .name = "version",
+            .description = "Display program version",
+        },
+    },
+};
+
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    var main_cmd = try zpotify.init(gpa.allocator(), .{});
+    defer main_cmd.deinit();
+    var args_iter = try cova.ArgIteratorGeneric.init(gpa.allocator());
+    defer args_iter.deinit();
+
+    const stdout = std.io.getStdOut().writer();
+    try cova.parseArgs(&args_iter, CommandT, main_cmd, stdout, .{});
+    const main_opts = try main_cmd.getOpts(.{});
+    _ = main_opts;
+
     var args = std.process.args();
     progname = args.next().?;
     const command = args.next() orelse {
