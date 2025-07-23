@@ -423,22 +423,22 @@ const InputParser = struct {
             self.advanceBufferBy(len);
         }
         const sequences = std.StaticStringMap(Input).initComptime(.{
-            .{ "1", .{ .content = .home } },
-            .{ "2", .{ .content = .insert } },
-            .{ "3", .{ .content = .delete } },
-            .{ "4", .{ .content = .home } },
-            .{ "5", .{ .content = .page_up } },
-            .{ "6", .{ .content = .page_down } },
-            .{ "7", .{ .content = .home } },
-            .{ "8", .{ .content = .home } },
-            .{ "15", .{ .content = .{ .function = 5 } } },
-            .{ "17", .{ .content = .{ .function = 6 } } },
-            .{ "18", .{ .content = .{ .function = 7 } } },
-            .{ "19", .{ .content = .{ .function = 8 } } },
-            .{ "20", .{ .content = .{ .function = 9 } } },
-            .{ "21", .{ .content = .{ .function = 10 } } },
-            .{ "23", .{ .content = .{ .function = 11 } } },
-            .{ "24", .{ .content = .{ .function = 12 } } },
+            .{ "1", Input{ .content = .home } },
+            .{ "2", Input{ .content = .insert } },
+            .{ "3", Input{ .content = .delete } },
+            .{ "4", Input{ .content = .home } },
+            .{ "5", Input{ .content = .page_up } },
+            .{ "6", Input{ .content = .page_down } },
+            .{ "7", Input{ .content = .home } },
+            .{ "8", Input{ .content = .home } },
+            .{ "15", Input{ .content = .{ .function = 5 } } },
+            .{ "17", Input{ .content = .{ .function = 6 } } },
+            .{ "18", Input{ .content = .{ .function = 7 } } },
+            .{ "19", Input{ .content = .{ .function = 8 } } },
+            .{ "20", Input{ .content = .{ .function = 9 } } },
+            .{ "21", Input{ .content = .{ .function = 10 } } },
+            .{ "23", Input{ .content = .{ .function = 11 } } },
+            .{ "24", Input{ .content = .{ .function = 12 } } },
         });
         var ev = sequences.get(num) orelse return Input{ .content = .unknown };
         const modifiers = if (modifiers_str) |md| ((fmt.parseInt(u16, md, 10) catch return Input{ .content = .unknown }) - @as(u16, 1)) else undefined;

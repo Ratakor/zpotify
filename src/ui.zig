@@ -23,12 +23,12 @@ pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
         .mask = std.posix.empty_sigset,
         .flags = 0,
     };
-    try std.posix.sigaction(std.posix.SIG.WINCH, &sa, null);
+    std.posix.sigaction(std.posix.SIG.WINCH, &sa, null);
 
     try term.uncook(.{ .request_mouse_tracking = true });
     try term.fetchSize();
 
-    term_info = c.chafa_term_db_detect(c.chafa_term_db_get_default(), std.c.environ).?;
+    term_info = c.chafa_term_db_detect(c.chafa_term_db_get_default(), @ptrCast(std.c.environ)).?;
 
     const symbol_map = c.chafa_symbol_map_new().?;
     defer c.chafa_symbol_map_unref(symbol_map);
@@ -520,7 +520,7 @@ pub const Table = struct {
 
 const Column = struct {
     header_name: []const u8,
-    field: @Type(.EnumLiteral),
+    field: @Type(.enum_literal),
     size: usize, // in %
 };
 
@@ -529,7 +529,7 @@ fn makeDrawFn(
     comptime title: []const u8,
     comptime columns: []const Column,
     comptime writeField: fn (
-        comptime field: @Type(.EnumLiteral),
+        comptime field: @Type(.enum_literal),
         item: T,
         writer: anytype,
     ) anyerror!void,
@@ -726,7 +726,7 @@ const drawTracks = makeDrawFn(
     },
     struct {
         fn writeField(
-            comptime field: @Type(.EnumLiteral),
+            comptime field: @Type(.enum_literal),
             item: api.Track,
             writer: anytype,
         ) anyerror!void {
@@ -762,7 +762,7 @@ const drawArtists = makeDrawFn(
     },
     struct {
         fn writeField(
-            comptime field: @Type(.EnumLiteral),
+            comptime field: @Type(.enum_literal),
             item: api.Artist,
             writer: anytype,
         ) anyerror!void {
@@ -793,7 +793,7 @@ const drawAlbums = makeDrawFn(
     },
     struct {
         fn writeField(
-            comptime field: @Type(.EnumLiteral),
+            comptime field: @Type(.enum_literal),
             item: api.Album,
             writer: anytype,
         ) anyerror!void {
@@ -824,7 +824,7 @@ const drawPlaylists = makeDrawFn(
     },
     struct {
         fn writeField(
-            comptime field: @Type(.EnumLiteral),
+            comptime field: @Type(.enum_literal),
             item: api.Playlist,
             writer: anytype,
         ) anyerror!void {
@@ -849,7 +849,7 @@ pub const drawDevices = makeDrawFn(
     },
     struct {
         fn writeField(
-            comptime field: @Type(.EnumLiteral),
+            comptime field: @Type(.enum_literal),
             item: api.Device,
             writer: anytype,
         ) anyerror!void {

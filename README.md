@@ -16,7 +16,7 @@ makepkg -si
 
 ### Building
 
-Requires zig 0.13.0, libjpeg and chafa.
+Requires zig 0.14.0, libjpeg and chafa.
 ```
 git clone https://github.com/ratakor/zpotify
 cd zpotify

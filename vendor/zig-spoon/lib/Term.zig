@@ -236,10 +236,10 @@ pub fn fetchSize(self: *Self) !void {
     if (std.posix.errno(err) != .SUCCESS) {
         return std.posix.unexpectedErrno(@as(os.E, @enumFromInt(err)));
     }
-    self.height = size.ws_row;
-    self.width = size.ws_col;
-    self.width_pixels = size.ws_xpixel;
-    self.height_pixels = size.ws_ypixel;
+    self.height = size.row;
+    self.width = size.col;
+    self.width_pixels = size.xpixel;
+    self.height_pixels = size.ypixel;
 }
 
 /// Set window title using OSC 2. Shall not be called while rendering.

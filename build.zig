@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const spoon = b.dependency("zig-spoon", .{}).module("spoon");
+    const spoon = b.dependency("spoon", .{}).module("spoon");
 
     const exe = b.addExecutable(.{
         .name = "zpotify",
@@ -30,6 +30,6 @@ pub fn build(b: *std.Build) void {
     fmt_step.dependOn(&b.addFmt(.{ .paths = &.{ "build.zig", "src" } }).step);
 
     const clean_step = b.step("clean", "Remove build artifacts");
-    clean_step.dependOn(&b.addRemoveDirTree(".zig-cache").step);
-    clean_step.dependOn(&b.addRemoveDirTree("zig-out").step);
+    clean_step.dependOn(&b.addRemoveDirTree(b.path(".zig-cache")).step);
+    clean_step.dependOn(&b.addRemoveDirTree(b.path("zig-out")).step);
 }

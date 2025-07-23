@@ -215,7 +215,7 @@ fn getItemFromMenu(
 }
 
 fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]const u8 {
-    const T = @typeInfo(@TypeOf(items)).Pointer.child;
+    const T = @typeInfo(@TypeOf(items)).pointer.child;
 
     // pipe[0] = read, pipe[1] = write
     const p2c_pipe = try std.posix.pipe(); // parent -> child

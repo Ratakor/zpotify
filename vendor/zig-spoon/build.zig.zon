@@ -1,5 +1,6 @@
 .{
-    .name = "zig-spoon",
+    .name = .spoon,
+    .fingerprint = 0x188b7ab412029d40,
     .version = "0.1.0",
     .dependencies = .{},
     .paths = .{

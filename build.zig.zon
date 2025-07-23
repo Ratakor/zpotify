@@ -1,9 +1,10 @@
 .{
-    .name = "zpotify",
+    .name = .zpotify,
+    .fingerprint = 0x7c117f9b8cb9acba,
     .version = "0.3.0",
-    .minimum_zig_version = "0.13.0",
+    .minimum_zig_version = "0.14.0",
     .dependencies = .{
-        .@"zig-spoon" = .{ .path = "vendor/zig-spoon" },
+        .spoon = .{ .path = "vendor/zig-spoon" },
     },
     .paths = .{""},
 }
