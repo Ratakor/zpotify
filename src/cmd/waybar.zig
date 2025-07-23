@@ -65,8 +65,17 @@ pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
             const builder_writer = builder.writer();
             try builder.appendSlice("Track: ");
             try builder.appendSlice(track.name);
-            try builder.appendSlice("\nArtist(s): ");
-            try builder.appendSlice(track.artists[0].name);
+            if (track.artists.len == 1) {
+                try builder.appendSlice("\nArtist: ");
+                try builder.appendSlice(track.artists[0].name);
+            } else {
+                try builder.appendSlice("\nArtists: ");
+                try builder.appendSlice(track.artists[0].name);
+                for (track.artists[1..]) |artist| {
+                    try builder.appendSlice(", ");
+                    try builder.appendSlice(artist.name);
+                }
+            }
             try builder.appendSlice("\nAlbum: ");
             try builder.appendSlice(track.album.name);
             try builder.appendSlice("\nDevice: ");
