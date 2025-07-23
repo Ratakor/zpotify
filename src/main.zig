@@ -122,7 +122,7 @@ pub fn main() !void {
         return cmd.shuffle.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "seek")) {
         return cmd.seek.exec(&client, args.next());
-    } else if (std.mem.eql(u8, command, "vol")) {
+    } else if (std.mem.eql(u8, command, "vol") or std.mem.eql(u8, command, "volume")) {
         return cmd.vol.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "like")) {
         return cmd.like.exec(&client);

@@ -20,7 +20,7 @@ Requires zig 0.14.0, libjpeg and chafa.
 ```
 git clone https://github.com/ratakor/zpotify
 cd zpotify
-zig build -Doptimize=ReleaseFast
+zig build -Doptimize=ReleaseSafe
 ```
 Zsh completions are available [here](_zpotify)!
 

@@ -30,7 +30,7 @@ pub fn exec(command: ?[]const u8) void {
             stderr.print(cmd.shuffle.usage, .{main.progname}) catch unreachable;
         } else if (std.mem.eql(u8, com, "seek")) {
             stderr.print(cmd.seek.usage, .{main.progname}) catch unreachable;
-        } else if (std.mem.eql(u8, com, "vol")) {
+        } else if (std.mem.eql(u8, com, "vol") or std.mem.eql(u8, com, "volume")) {
             stderr.print(cmd.vol.usage, .{main.progname}) catch unreachable;
         } else if (std.mem.eql(u8, com, "like")) {
             stderr.print(cmd.like.usage, .{main.progname}) catch unreachable;
