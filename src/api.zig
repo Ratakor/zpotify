@@ -7,6 +7,7 @@ const api_url = "https://api.spotify.com/v1";
 
 /// https://developer.spotify.com/documentation/web-api/concepts/scopes
 pub const scopes = [_][]const u8{
+    "user-read-currently-playing",
     "user-read-playback-state",
     "user-modify-playback-state",
     "user-library-modify",
@@ -260,6 +261,11 @@ pub const Search = struct {
     artists: ?Artists = null,
     albums: ?Albums(.default) = null,
     playlists: ?Playlists = null,
+};
+
+pub const Queue = struct {
+    currently_playing: ?Track = null,
+    queue: []const Track = &[_]Track{},
 };
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
@@ -539,4 +545,9 @@ pub fn getArtistAlbums(
         .{ id, limit, offset },
     );
     return client.sendRequest(Albums(.default), .GET, url, null);
+}
+
+/// https://developer.spotify.com/documentation/web-api/reference/get-queue
+pub fn getQueue(client: *Client) !Queue {
+    return try client.sendRequest(Queue, .GET, api_url ++ "/me/player/queue", null);
 }

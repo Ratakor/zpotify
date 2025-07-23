@@ -41,6 +41,7 @@ Commands:
   seek       | Get/Set the position of the current track
   vol        | Get/Set volume or increase/decrease volume by 10%
   like       | Add the current track to your liked songs
+  queue      | Display tracks in the queue
   devices    | List all available devices
   transfer   | Transfer playback to another device
   waybar     | Display infos about the current playback for a waybar module
@@ -99,3 +100,4 @@ Benchmark 2 (43 runs): ./run zpotify
 - add man page with [zzdoc](https://github.com/rockorager/zzdoc)
 - redo the perf analysis
 - add test coverage
+- add a tui like `search` for `queue` to edit the queue

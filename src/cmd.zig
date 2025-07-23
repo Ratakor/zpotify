@@ -16,6 +16,7 @@ pub const shuffle = @import("cmd/shuffle.zig");
 pub const seek = @import("cmd/seek.zig");
 pub const vol = @import("cmd/vol.zig");
 pub const like = @import("cmd/like.zig");
+pub const queue = @import("cmd/queue.zig");
 pub const devices = @import("cmd/devices.zig");
 pub const transfer = @import("cmd/transfer.zig");
 pub const waybar = @import("cmd/waybar.zig");

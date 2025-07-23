@@ -26,6 +26,7 @@ pub const usage =
     \\  seek       | Get/Set the position of the current track
     \\  vol        | Get/Set volume or increase/decrease volume by 10%
     \\  like       | Add the current track to your liked songs
+    \\  queue      | Display tracks in the queue
     \\  devices    | List all available devices
     \\  transfer   | Transfer playback to another device
     \\  waybar     | Display infos about the current playback for a waybar module
@@ -126,6 +127,8 @@ pub fn main() !void {
         return cmd.vol.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "like")) {
         return cmd.like.exec(&client);
+    } else if (std.mem.eql(u8, command, "queue")) {
+        return cmd.queue.exec(&client);
     } else if (std.mem.eql(u8, command, "devices")) {
         return cmd.devices.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "transfer")) {
