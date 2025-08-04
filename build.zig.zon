@@ -2,7 +2,7 @@
     .name = .zpotify,
     .fingerprint = 0x7c117f9b8cb9acba,
     .version = "0.3.0",
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.14.1",
     .dependencies = .{
         .spoon = .{ .path = "vendor/zig-spoon" },
     },

@@ -6,7 +6,7 @@ const c = @cImport({
     @cInclude("jpeglib.h");
     @cInclude("jerror.h");
     @cInclude("setjmp.h");
-    @cInclude("chafa/chafa.h");
+    @cInclude("chafa.h");
 });
 
 pub var term: spoon.Term = undefined;
