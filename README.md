@@ -90,12 +90,14 @@ Benchmark 2 (43 runs): ./run zpotify
 - [chafa](https://github.com/hpjansson/chafa)
 
 ## TODO
+- make image support optional via a compile option
+- autogen zsh completions
+- custom nix flake instead of using zig2nix?
 - add `zpotify play liked` cmd which play liked songs
 - add a way to save track / album to a playlist
-- embed [librespot](https://github.com/librespot-org/librespot)
+- embed [librespot](https://github.com/librespot-org/librespot) or add a wrapper like [librespot-cfg](https://gist.github.com/Ratakor/7dab4b17311a5c60d3b36ad34a02388a)
   - need to create bindings
   - use [build.crab](https://github.com/akarpovskii/build.crab) for build integration
-  - use [ziggy](https://github.com/kristoff-it/ziggy) for config
   - librespot alternative?: [cspot](https://github.com/feelfreelinux/cspot)
 - add man page with [zzdoc](https://github.com/rockorager/zzdoc)
 - redo the perf analysis
