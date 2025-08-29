@@ -28,12 +28,15 @@ const Query = enum {
         };
     }
 
-    fn ListType(comptime query: Query) type {
-        return switch (query) {
-            .track => api.Tracks(.saved),
-            .playlist => api.Playlists,
-            .album => api.Albums(.saved),
-            .artist => api.Artists,
+    fn NodeType(comptime query: Query) type {
+        return struct {
+            data: switch (query) {
+                .track => api.Tracks(.saved),
+                .playlist => api.Playlists,
+                .album => api.Albums(.saved),
+                .artist => api.Artists,
+            },
+            node: std.DoublyLinkedList.Node = .{},
         };
     }
 };
@@ -150,24 +153,26 @@ fn getItemFromMenu(
     client: *api.Client,
     allocator: std.mem.Allocator, // arena allocator
 ) !query.Type() {
+    const Node = query.NodeType();
+
     const dmenu_cmd = std.posix.getenv("DMENU") orelse "dmenu -i";
 
-    const List = std.DoublyLinkedList(query.ListType());
-    var list: List = .{};
+    var list: std.DoublyLinkedList = .{};
     list.prepend(blk: {
-        const node = try allocator.create(List.Node);
+        const node = try allocator.create(Node);
         node.* = .{ .data = try switch (query) {
             .track => api.getUserTracks(client, limit, 0),
             .playlist => api.getUserPlaylists(client, limit, 0),
             .album => api.getUserAlbums(client, limit, 0),
             .artist => api.getUserArtists(client, limit, null),
         } };
-        break :blk node;
+        break :blk &node.node;
     });
     var current = list.first.?;
 
     while (true) {
-        const result = try spawnMenu(allocator, dmenu_cmd, current.data.items);
+        const current_data = @as(*Node, @fieldParentPtr("node", current)).data;
+        const result = try spawnMenu(allocator, dmenu_cmd, current_data.items);
         defer allocator.free(result);
 
         if (std.mem.eql(u8, "previous", result)) {
@@ -175,30 +180,30 @@ fn getItemFromMenu(
         } else if (std.mem.eql(u8, "next", result)) {
             current = current.next orelse blk: {
                 if (query == .artist) {
-                    if (current.data.cursors.after) |after| {
-                        const node = try allocator.create(List.Node);
+                    if (current_data.cursors.after) |after| {
+                        const node = try allocator.create(Node);
                         node.* = .{ .data = try api.getUserArtists(client, limit, after) };
-                        list.insertAfter(current, node);
-                        break :blk node;
+                        list.insertAfter(current, &node.node);
+                        break :blk &node.node;
                     }
                 } else {
-                    if (current.data.next) |_| {
-                        const offset = current.data.offset + limit;
-                        const node = try allocator.create(List.Node);
+                    if (current_data.next) |_| {
+                        const offset = current_data.offset + limit;
+                        const node = try allocator.create(Node);
                         node.* = .{ .data = try switch (query) {
                             .track => api.getUserTracks(client, limit, offset),
                             .playlist => api.getUserPlaylists(client, limit, offset),
                             .album => api.getUserAlbums(client, limit, offset),
                             .artist => unreachable,
                         } };
-                        list.insertAfter(current, node);
-                        break :blk node;
+                        list.insertAfter(current, &node.node);
+                        break :blk &node.node;
                     }
                 }
                 break :blk list.first.?;
             };
         } else {
-            for (current.data.items) |_item| {
+            for (current_data.items) |_item| {
                 const item = switch (query) {
                     .track => _item.track,
                     .album => _item.album,
@@ -269,7 +274,7 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
 
     if (@hasField(T, "track") or @hasField(T, "album")) {
         if (std.mem.indexOfScalar(u8, item, '-')) |i| {
-            return allocator.dupe(u8, item[i + 2..]);
+            return allocator.dupe(u8, item[i + 2 ..]);
         }
     }
 
