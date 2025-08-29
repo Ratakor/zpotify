@@ -4,7 +4,14 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const spoon = b.dependency("spoon", .{}).module("spoon");
+    const axe_module = b.dependency("axe", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("axe");
+    const spoon_module = b.dependency("spoon", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("spoon");
 
     const exe = b.addExecutable(.{
         .name = "zpotify",
@@ -12,7 +19,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.root_module.addImport("spoon", spoon);
+    exe.root_module.addImport("spoon", spoon_module);
+    exe.root_module.addImport("axe", axe_module);
     exe.linkLibC();
     exe.linkSystemLibrary("chafa");
     exe.linkSystemLibrary("libjpeg");

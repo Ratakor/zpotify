@@ -1,10 +1,16 @@
 .{
     .name = .zpotify,
-    .fingerprint = 0x7c117f9b8cb9acba,
     .version = "0.3.0",
+    .fingerprint = 0x7c117f9b8cb9acba,
     .minimum_zig_version = "0.14.1",
     .dependencies = .{
-        .spoon = .{ .path = "vendor/zig-spoon" },
+        .spoon = .{
+            .path = "vendor/zig-spoon",
+        },
+        .axe = .{
+            .url = "git+https://github.com/Ratakor/axe#4df48b5fd1bd8496dc3a9ed49790649b7c4e8fee",
+            .hash = "axe-0.7.0-M2JU5cyPAADJQcWDZE7xNmnuQtAgwmPLyCMjiLhOptrC",
+        },
     },
     .paths = .{""},
 }

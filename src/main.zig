@@ -1,14 +1,21 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const axe = @import("axe").Axe(.{
+    .scope_format = "@%",
+    .mutex = .{ .function = .progress_stderr },
+});
 const Client = @import("Client.zig");
 const cmd = @import("cmd.zig");
 
+
 pub const std_options: std.Options = .{
     .log_level = if (builtin.mode == .Debug) .debug else .info,
-    .logFn = coloredLog,
+    .logFn = axe.log,
 };
 
+// TODO: use build_options instead
 pub const version = "0.3.0";
+// TODO: hard code that
 pub var progname: []const u8 = undefined;
 
 pub const usage =
@@ -36,63 +43,17 @@ pub const usage =
     \\
 ;
 
-const Color = enum(u8) {
-    black = 30,
-    red,
-    green,
-    yellow,
-    blue,
-    magenta,
-    cyan,
-    white,
-    default,
-    bright_black = 90,
-    bright_red,
-    bright_green,
-    bright_yellow,
-    bright_blue,
-    bright_magenta,
-    bright_cyan,
-    bright_white,
-
-    const csi = "\x1b[";
-    const reset = csi ++ "0m";
-    const bold = csi ++ "1m";
-
-    fn toSeq(comptime fg: Color) []const u8 {
-        return comptime csi ++ std.fmt.digits2(@intFromEnum(fg)) ++ "m";
-    }
-};
-
-fn coloredLog(
-    comptime message_level: std.log.Level,
-    comptime scope: @Type(.enum_literal),
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    const level_txt = comptime switch (message_level) {
-        .err => Color.bold ++ Color.red.toSeq() ++ "error" ++ Color.reset,
-        .warn => Color.bold ++ Color.yellow.toSeq() ++ "warning" ++ Color.reset,
-        .info => Color.bold ++ Color.blue.toSeq() ++ "info" ++ Color.reset,
-        .debug => Color.bold ++ Color.cyan.toSeq() ++ "debug" ++ Color.reset,
-    };
-    const scope_prefix = (if (scope != .default) "@" ++ @tagName(scope) else "") ++ ": ";
-    var bw = std.io.bufferedWriter(comptime switch (message_level) {
-        .err, .warn, .debug => std.io.getStdErr().writer(),
-        .info => std.io.getStdOut().writer(),
-    });
-    const writer = bw.writer();
-    writer.print(level_txt ++ scope_prefix ++ format ++ "\n", args) catch return;
-    bw.flush() catch return;
-}
-
 pub fn main() !void {
     var args = std.process.args();
     progname = args.next().?;
-    const command = args.next() orelse {
+    var command = args.next() orelse {
         cmd.help.exec(null);
         std.process.exit(1);
     };
+
+    if (std.mem.startsWith(u8, command, "--")) {
+        command = command[2..];
+    }
 
     if (std.mem.eql(u8, command, "logout")) {
         return cmd.logout.exec(std.heap.c_allocator);
