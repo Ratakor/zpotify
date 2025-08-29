@@ -16,7 +16,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             !std.mem.eql(u8, state, "off"))
         {
             std.log.err("Invalid repeat mode: {s}", .{state});
-            help.exec("repeat");
+            try help.exec("repeat");
             std.process.exit(1);
         }
         std.log.info("Setting repeat mode to {s}", .{state});

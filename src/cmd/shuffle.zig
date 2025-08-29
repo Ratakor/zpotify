@@ -18,7 +18,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
                 break :blk false;
             } else {
                 std.log.err("Invalid state: {s}", .{state});
-                help.exec("shuffle");
+                try help.exec("shuffle");
                 std.process.exit(1);
             }
         } else {

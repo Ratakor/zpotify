@@ -27,9 +27,8 @@ pub const usage =
 const bar_len = 40;
 
 pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
-    // is buffering needed?
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    // buffering not needed & disabled on purpose
+    var stdout_writer = std.fs.File.stdout().writer(&.{});
     const stdout = &stdout_writer.interface;
 
     // arena is reset on each loop iteration, there is no need to call deinit or free
@@ -104,6 +103,5 @@ pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
         };
 
         try stdout.print("{f}", .{std.json.fmt(.{ .text = text, .tooltip = tooltip }, .{})});
-        try stdout.flush();
     }
 }

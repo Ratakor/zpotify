@@ -26,7 +26,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         std.process.exit(1);
     } else {
         std.log.err("Missing device name/ID", .{});
-        help.exec("transfer");
+        try help.exec("transfer");
         std.process.exit(1);
     }
 }

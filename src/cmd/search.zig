@@ -40,12 +40,12 @@ pub fn exec(
     const kind = if (args.next()) |arg| blk: {
         break :blk std.meta.stringToEnum(Table.Kind, arg) orelse {
             std.log.err("Invalid query type: '{s}'", .{arg});
-            help.exec("search");
+            try help.exec("search");
             std.process.exit(1);
         };
     } else {
         std.log.err("Missing query type", .{});
-        help.exec("search");
+        try help.exec("search");
         std.process.exit(1);
     };
 
@@ -55,22 +55,18 @@ pub fn exec(
     const allocator = arena.allocator();
 
     const query = blk: {
-        var builder = std.ArrayList([]const u8).init(allocator);
-        defer builder.deinit();
+        var builder: std.ArrayList([]const u8) = .empty;
         while (args.next()) |arg| {
-            try builder.append(arg);
+            try builder.append(allocator, arg);
         }
         if (builder.items.len == 0) {
             std.log.err("Missing query", .{});
-            help.exec("search");
+            try help.exec("search");
             std.process.exit(1);
         }
         break :blk try std.mem.join(allocator, " ", builder.items);
     };
-    const title = try std.fmt.allocPrint(allocator, "zpotify: search {s} '{s}'", .{
-        @tagName(kind),
-        query,
-    });
+    const title = try std.fmt.allocPrint(allocator, "zpotify: search {t} '{s}'", .{ kind, query });
     current_table = try Table.init(client, allocator, kind, title, query, getFetchFn(kind));
 
     try ui.init(handleSigWinch);
@@ -340,7 +336,7 @@ fn playFallback() !void {
     }
 }
 
-fn handleSigWinch(_: c_int) callconv(.C) void {
+fn handleSigWinch(_: c_int) callconv(.c) void {
     ui.term.fetchSize() catch return;
     current_table.resetPosition();
     if (!ui.term.currently_rendering) {

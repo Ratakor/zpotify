@@ -168,7 +168,7 @@ fn handleFormatArg(writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackSt
             };
             const start_pause = (std.mem.indexOfScalar(u8, arg[start_play..], '/') orelse {
                 std.log.err("Invalid state format: {s}", .{arg});
-                help.exec("print");
+                try help.exec("print");
                 std.process.exit(1);
             }) + start_play;
             break :blk .{ arg[start_play + 1 .. start_pause], arg[start_pause + 1 ..] };
@@ -275,7 +275,7 @@ fn handleFormatArg(writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackSt
         }
     } else {
         std.log.err("Unknown format argument: {s}", .{arg});
-        help.exec("print");
+        try help.exec("print");
         std.process.exit(1);
     }
 }

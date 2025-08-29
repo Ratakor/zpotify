@@ -36,7 +36,9 @@ pub fn init(
     const cwd = std.fs.cwd();
     const save_file = if (cwd.openFile(save_path, .{ .mode = .read_write })) |save_file| blk: {
         defer save_file.close();
-        var json_reader = std.json.reader(fba_allocator, save_file.reader());
+        var save_file_buffer: [1024]u8 = undefined;
+        var save_file_reader = save_file.reader(&save_file_buffer);
+        var json_reader: std.json.Reader = .init(fba_allocator, &save_file_reader.interface);
         defer json_reader.deinit();
         if (std.json.parseFromTokenSourceLeaky(Save, arena_allocator, &json_reader, .{})) |save_json| {
             return .{
@@ -301,7 +303,8 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
 
     var client = try server.accept();
     defer client.stream.close();
-    const size = try client.stream.readAll(&buffer);
+    var reader = client.stream.reader(&.{});
+    const size = try reader.interface().readSliceShort(&buffer);
     const response = buffer[0..size];
     const start = std.mem.indexOf(u8, response, "code=").? + "code=".len;
     const end = std.mem.indexOfScalar(u8, response[start..], ' ').? + start;

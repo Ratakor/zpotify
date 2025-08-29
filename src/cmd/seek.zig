@@ -13,10 +13,10 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     if (arg) |raw_arg| {
         var min, var sec = blk: {
             const sep = std.mem.indexOfScalar(u8, raw_arg, ':') orelse {
-                break :blk .{ 0, parseUnsigned(raw_arg) };
+                break :blk .{ 0, try parseUnsigned(raw_arg) };
             };
-            const min = parseUnsigned(raw_arg[0..sep]);
-            const sec = parseUnsigned(raw_arg[sep + 1 ..]);
+            const min = try parseUnsigned(raw_arg[0..sep]);
+            const sec = try parseUnsigned(raw_arg[sep + 1 ..]);
             break :blk .{ min, sec };
         };
         min += sec / std.time.s_per_min;
@@ -48,10 +48,10 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     }
 }
 
-fn parseUnsigned(buf: []const u8) u64 {
+fn parseUnsigned(buf: []const u8) !u64 {
     return std.fmt.parseUnsigned(u64, buf, 10) catch |err| {
         std.log.err("Invalid time format: {}", .{err});
-        help.exec("seek");
+        try help.exec("seek");
         std.process.exit(1);
     };
 }

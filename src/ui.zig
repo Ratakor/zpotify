@@ -20,7 +20,7 @@ pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
 
     const sa: std.posix.Sigaction = .{
         .handler = .{ .handler = sigWinchHandler },
-        .mask = std.posix.empty_sigset,
+        .mask = std.posix.sigemptyset(),
         .flags = 0,
     };
     std.posix.sigaction(std.posix.SIG.WINCH, &sa, null);
@@ -68,13 +68,13 @@ const JpegErrorManager = extern struct {
         return &self.mgr;
     }
 
-    fn errorExit(cinfo: c.j_common_ptr) callconv(.C) void {
+    fn errorExit(cinfo: c.j_common_ptr) callconv(.c) void {
         const self: *JpegErrorManager = @ptrCast(cinfo.*.err);
         self.mgr.output_message.?(cinfo);
         c.longjmp(&self.setjmp_buffer, 1);
     }
 
-    fn outputMessage(cinfo: c.j_common_ptr) callconv(.C) void {
+    fn outputMessage(cinfo: c.j_common_ptr) callconv(.c) void {
         const self: *JpegErrorManager = @ptrCast(cinfo.*.err);
         var buffer: [c.JMSG_LENGTH_MAX]u8 = undefined;
         const ptr: [*c]u8 = @ptrCast(&buffer);

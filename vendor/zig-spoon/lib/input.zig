@@ -140,10 +140,10 @@ pub const InputContent = union(enum) {
                     try writer.print("{u}", .{codepoint});
                 }
             },
-            .mouse => |mouse| try writer.print("mouse({}, {}, {s})", .{
+            .mouse => |mouse| try writer.print("mouse({d}, {d}, {t})", .{
                 mouse.x,
                 mouse.y,
-                @tagName(mouse.button),
+                mouse.button,
             }),
         }
     }

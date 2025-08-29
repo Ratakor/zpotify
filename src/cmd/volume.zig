@@ -37,12 +37,12 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         } else {
             volume = std.fmt.parseUnsigned(u64, vol, 10) catch |err| {
                 std.log.err("Invalid volume: {}", .{err});
-                help.exec("vol");
+                try help.exec("vol");
                 std.process.exit(1);
             };
             if (volume > 100) {
                 std.log.err("Volume must be between 0 and 100", .{});
-                help.exec("vol");
+                try help.exec("vol");
                 std.process.exit(1);
             }
         }

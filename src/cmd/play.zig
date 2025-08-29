@@ -46,7 +46,7 @@ pub fn exec(
     const query = if (arg) |value| blk: {
         break :blk std.meta.stringToEnum(Query, value) orelse {
             std.log.err("Invalid query type: '{s}'", .{value});
-            help.exec("play");
+            try help.exec("play");
             std.process.exit(1);
         };
     } else {
