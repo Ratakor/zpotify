@@ -15,7 +15,7 @@ var term_info: *c.ChafaTermInfo = undefined;
 var chafa_config: *c.ChafaCanvasConfig = undefined;
 
 pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
-    try term.init(.{});
+    term = try .init(.{});
     errdefer term.deinit();
 
     const sa: std.posix.Sigaction = .{
@@ -116,24 +116,26 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
 
         var client: std.http.Client = .{ .allocator = allocator };
         defer client.deinit();
-        var response = std.ArrayList(u8).init(allocator);
+        var response: std.Io.Writer.Allocating = .init(allocator);
         defer response.deinit();
         // TODO: this is a big bottleneck
         const result = try client.fetch(.{
             .method = .GET,
             .location = .{ .url = url },
-            .response_storage = .{ .dynamic = &response },
-            .max_append_size = 1024 * 1024,
+            .response_writer = &response.writer,
         });
 
         if (result.status != .ok) {
             // std.log.err("Failed to fetch {s}: {d}", .{ url, result.status });
             std.log.debug("Failed to fetch {s}: {d}", .{ url, result.status });
-            std.log.debug("Response: {s}", .{response.items});
+            std.log.debug("Response: {s}", .{response.written()});
             return error.BadResponse;
         }
 
-        try file.writeAll(response.items);
+        var file_buffer: [4096]u8 = undefined;
+        var file_writer = file.writer(&file_buffer);
+        try file_writer.interface.writeAll(response.written());
+
         break :blk try response.toOwnedSlice();
     };
     defer allocator.free(jpeg_image);
@@ -228,10 +230,10 @@ fn detectTerminal(config: *c.ChafaCanvasConfig) void {
 
 pub const Table = struct {
     list: union(enum) {
-        tracks: std.ArrayListUnmanaged(api.Track),
-        artists: std.ArrayListUnmanaged(api.Artist),
-        albums: std.ArrayListUnmanaged(api.Album),
-        playlists: std.ArrayListUnmanaged(api.Playlist),
+        tracks: std.ArrayList(api.Track),
+        artists: std.ArrayList(api.Artist),
+        albums: std.ArrayList(api.Album),
+        playlists: std.ArrayList(api.Playlist),
     },
     client: *api.Client,
     allocator: std.mem.Allocator,
@@ -408,15 +410,16 @@ pub const Table = struct {
                 next_table.query = album.id;
                 next_table.has_next = false; // it's easier to fetch all tracks at once
                 next_table.title = blk: {
-                    var builder = std.ArrayList(u8).init(next_table.allocator);
-                    try builder.appendSlice("zpotify: ");
-                    try builder.appendSlice(album.name);
-                    try builder.appendSlice(" - ");
+                    const allocator = next_table.allocator;
+                    var builder: std.ArrayList(u8) = .empty;
+                    try builder.appendSlice(allocator, "zpotify: ");
+                    try builder.appendSlice(allocator, album.name);
+                    try builder.appendSlice(allocator, " - ");
                     for (album.artists, 0..) |artist, i| {
-                        if (i != 0) try builder.appendSlice(", ");
-                        try builder.appendSlice(artist.name);
+                        if (i != 0) try builder.appendSlice(allocator, ", ");
+                        try builder.appendSlice(allocator, artist.name);
                     }
-                    break :blk try builder.toOwnedSlice();
+                    break :blk try builder.toOwnedSlice(allocator);
                 };
 
                 while (true) {

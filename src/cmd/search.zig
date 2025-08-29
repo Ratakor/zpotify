@@ -89,7 +89,7 @@ fn loop() !void {
         const read = try ui.term.readInput(&buf);
         var it = spoon.inputParser(buf[0..read]);
         while (it.next()) |in| {
-            std.log.debug("Input: {}", .{in});
+            std.log.debug("Input: {f}", .{in});
 
             if (in.eqlDescription("q")) {
                 return;
@@ -184,7 +184,7 @@ fn loop() !void {
                 try current_table.remove(); // add remove command?
                 try notifyAction("Removed");
             } else if (in.content != .mouse) {
-                try notify(.err, "Invalid input: {}", .{in});
+                try notify(.err, "Invalid input: {f}", .{in});
             }
         }
     }

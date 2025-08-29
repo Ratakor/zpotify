@@ -12,9 +12,6 @@ pub const std_options: std.Options = .{
     .logFn = axe.log,
 };
 
-// TODO: use build_options instead
-pub const version = "0.3.0";
-
 pub const usage =
     \\Usage: zpotify [command] [options]
     \\

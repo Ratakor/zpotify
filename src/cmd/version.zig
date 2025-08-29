@@ -1,5 +1,5 @@
 const std = @import("std");
-const main = @import("../main.zig");
+const build_options = @import("build_options");
 
 pub const usage =
     \\Usage: zpotify version
@@ -9,5 +9,5 @@ pub const usage =
 ;
 
 pub fn exec() !void {
-    try std.fs.File.stdout().writeAll(main.version ++ "\n");
+    try std.fs.File.stdout().writeAll(build_options.version_string ++ "\n");
 }

@@ -90,6 +90,7 @@ Benchmark 2 (43 runs): ./run zpotify
 - [chafa](https://github.com/hpjansson/chafa)
 
 ## TODO
+- remove usage of std.Io.GenericWriter in spoon
 - make image support optional via a compile option
 - autogen zsh completions
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`

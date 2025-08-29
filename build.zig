@@ -24,6 +24,7 @@ pub fn build(b: *std.Build) void {
     const pie = b.option(bool, "pie", "Build a Position Independent Executable");
     const strip = b.option(bool, "strip", "Strip executable");
     const use_llvm = b.option(bool, "use-llvm", "Use Zig's llvm code backend");
+    // const image_support = b.option(bool, "image-support", "Build with image support (requires chafa and libjpeg)");
 
     const resolved_version = getVersion(b);
 
@@ -32,9 +33,11 @@ pub fn build(b: *std.Build) void {
         options.addOption([]const u8, "program_name", program_name);
         options.addOption(std.SemanticVersion, "version", resolved_version);
         options.addOption([]const u8, "version_string", b.fmt("{f}", .{resolved_version}));
+        // options.addOption(bool, "image_support", image_support orelse false);
         break :blk options.createModule();
     };
 
+    // TODO: build without libc/chafa/libjpeg support
     // zig build release
     var release_artifacts: [release_targets.len]*std.Build.Step.Compile = undefined;
     for (release_targets, &release_artifacts) |target_query, *artifact| {

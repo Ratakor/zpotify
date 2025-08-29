@@ -19,16 +19,19 @@ const std = @import("std");
 const ascii = std.ascii;
 const Io = std.Io;
 const mem = std.mem;
-const os = std.posix.system;
-const WriteError = std.posix.WriteError;
-const OpenError = std.posix.OpenError;
+const posix = std.posix;
+const os = posix.system;
+const WriteError = posix.WriteError;
+const OpenError = posix.OpenError;
 const unicode = std.unicode;
 const debug = std.debug;
 const math = std.math;
 
 const Attribute = @import("Attribute.zig");
 const spells = @import("spells.zig");
+// const RestrictedPaddingWriter = @import("RestrictedPaddingWriter.zig");
 const rpw = @import("restricted_padding_writer.zig");
+const buffered_writer = @import("buffered_writer.zig");
 
 const Self = @This();
 
@@ -60,26 +63,22 @@ currently_rendering: bool = false,
 tty: ?os.fd_t = null,
 
 /// Dumb writer. Don't use.
-// TODO: use Io.Writer instead
-const Writer = Io.GenericWriter(os.fd_t, WriteError, std.posix.write);
+// FIXME: use Io.Writer instead
+const Writer = Io.GenericWriter(os.fd_t, WriteError, posix.write);
 fn writer(self: Self) Writer {
     return .{ .context = self.tty.? };
 }
 
 /// Buffered writer. Use.
-// TODO: merge with above
-const BufferedWriter = Writer;
-// const BufferedWriter = Io.BufferedWriter(4096, Writer);
+// FIXME: merge with above(?)
+const BufferedWriter = buffered_writer.BufferedWriter(4096, Writer);
 fn bufferedWriter(self: Self) BufferedWriter {
-    // return Io.bufferedWriter(self.writer());
-    return self.writer();
+    return buffered_writer.bufferedWriter(self.writer());
 }
 
-pub fn init(self: *Self, term_config: TermConfig) !void {
-    // Only allow a single successful call to init.
-    debug.assert(self.tty == null);
-    const flags = os.O{ .ACCMODE = std.posix.ACCMODE.RDWR };
-    self.* = .{
+pub fn init(term_config: TermConfig) !Self {
+    const flags: os.O = .{ .ACCMODE = .RDWR };
+    return .{
         .tty = try std.posix.open(term_config.tty_name, flags, 0),
     };
 }

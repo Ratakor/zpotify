@@ -17,6 +17,7 @@
 const std = @import("std");
 const ascii = std.ascii;
 const fmt = std.fmt;
+const Io = std.Io;
 const unicode = std.unicode;
 const meta = std.meta;
 
@@ -47,16 +48,7 @@ pub const Input = struct {
     mod_super: bool = false,
     content: InputContent,
 
-    pub fn format(
-        self: Input,
-        comptime fmt_str: []const u8,
-        _: fmt.FormatOptions,
-        writer: anytype,
-    ) @TypeOf(writer).Error!void {
-        if (fmt_str.len != 0) {
-            fmt.invalidFmtError(fmt, self);
-        }
-
+    pub fn format(self: Input, writer: *Io.Writer) Io.Writer.Error!void {
         if (self.mod_super or self.mod_ctrl or self.mod_alt) {
             try writer.writeAll("<");
         }
@@ -71,7 +63,7 @@ pub const Input = struct {
             try writer.writeAll("A-");
         }
 
-        try self.content.format("", .{}, writer);
+        try self.content.format(writer);
 
         if (self.mod_super or self.mod_ctrl or self.mod_alt) {
             try writer.writeAll(">");
@@ -101,16 +93,7 @@ pub const InputContent = union(enum) {
 
     mouse: struct { x: usize, y: usize, button: MouseButton },
 
-    pub fn format(
-        self: InputContent,
-        comptime fmt_str: []const u8,
-        _: fmt.FormatOptions,
-        writer: anytype,
-    ) @TypeOf(writer).Error!void {
-        if (fmt_str.len != 0) {
-            fmt.invalidFmtError(fmt, self);
-        }
-
+    pub fn format(self: InputContent, writer: *Io.Writer) Io.Writer.Error!void {
         switch (self) {
             .unknown => try writer.writeAll("unknown"),
             .escape => try writer.writeAll("escape"),
