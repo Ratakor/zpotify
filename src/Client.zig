@@ -125,6 +125,8 @@ pub fn getSavePath(allocator: std.mem.Allocator) ![]const u8 {
     }
 }
 
+// don't be dumb and use `std.http.Client.fetch` directly instead of building your own wrapper
+// though it is bugged on zig 0.15.1 https://github.com/ziglang/zig/pull/24926
 pub inline fn sendRequest(
     self: *Client,
     comptime T: type,
@@ -135,13 +137,12 @@ pub inline fn sendRequest(
     return self.sendRequestOwned(T, method, url, body, self.arena.allocator());
 }
 
-// FIXME: all FIXME here should be handled for getToken() too
 pub fn sendRequestOwned(
     self: *Client,
     comptime T: type,
     comptime method: std.http.Method,
     url: []const u8,
-    body: ?[]const u8,
+    payload: ?[]const u8,
     arena_allocator: std.mem.Allocator,
 ) !T {
     const uri = try std.Uri.parse(url);
@@ -153,36 +154,49 @@ pub fn sendRequestOwned(
     });
     defer req.deinit();
 
-    if (body) |b| {
-        try req.sendBodyComplete(@constCast(b)); // FIXME this should be fine but consider make body ?[]u8
+    if (payload) |pl| {
+        // smh sendBodyComplete requires a []u8 not []const u8
+        // try req.sendBodyComplete(pl);
+        req.transfer_encoding = .{ .content_length = pl.len };
+        var body = try req.sendBodyUnflushed(&.{});
+        try body.writer.writeAll(pl);
+        try body.end();
+        try req.connection.?.flush();
     } else {
         try req.sendBodiless();
     }
-    var response = try req.receiveHead(&.{}); // FIXME does this need redirect buffer?
 
-    // FIXME: remove that
-    var it = response.head.iterateHeaders();
-    while (it.next()) |header| {
-        std.log.debug("sendRequest({}, {s}): Response header: {s}: {s}", .{
-            method,
-            url,
-            header.name,
-            header.value,
-        });
+    // redirect_buffer is not needed if we have a payload but oh well
+    var redirect_buffer: [8 * 1024]u8 = undefined;
+    var response = try req.receiveHead(&redirect_buffer);
+
+    std.log.debug(
+        "sendRequest({}, {s}): Response status: {t} ({d})",
+        .{ method, url, response.head.status, @intFromEnum(response.head.status) },
+    );
+
+    // usually compressed with gzip
+    var decompress_buffer: [std.compress.flate.max_window_len]u8 = undefined;
+    var transfer_buffer: [64]u8 = undefined;
+    var decompress: std.http.Decompress = undefined;
+    const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
+
+    // debug raw response
+    if (false) {
+        var stderr = std.fs.File.stderr().writer(&.{});
+        const response_writer = &stderr.interface;
+        _ = reader.streamRemaining(response_writer) catch |err| switch (err) {
+            error.ReadFailed => return response.bodyErr().?,
+            else => |e| return e,
+        };
     }
 
-    std.log.debug("sendRequest({}, {s}): Response status: {t} ({d})", .{
-        method,
-        url,
-        response.head.status,
-        @intFromEnum(response.head.status),
-    });
+    var json_reader: std.json.Reader = .init(fba.allocator(), reader);
+    defer json_reader.deinit();
 
     switch (response.head.status) {
         .ok => {
             if (T != void) {
-                var buffer: [1024]u8 = undefined;
-                var json_reader: std.json.Reader = .init(fba.allocator(), response.reader(&buffer));
                 return std.json.parseFromTokenSourceLeaky(T, arena_allocator, &json_reader, .{
                     .allocate = .alloc_always,
                     .ignore_unknown_fields = true,
@@ -203,8 +217,6 @@ pub fn sendRequestOwned(
                     reason: ?[]const u8 = null,
                 },
             };
-            var buffer: [1024]u8 = undefined;
-            var json_reader: std.json.Reader = .init(fba.allocator(), response.reader(&buffer));
             if (std.json.parseFromTokenSourceLeaky(
                 Error,
                 fba.allocator(),
@@ -227,10 +239,9 @@ fn updateSaveFile(self: Client, file: std.fs.File) !void {
         .access_token = self.access_token,
         .expiration = self.expiration,
     };
-    try file.seekTo(0);
-    var writer = file.writerStreaming(&.{});
-    // FIXME does this work?
-    // var writer = file.writer(&.{});
+    // try file.seekTo(0);
+    // var writer = file.writerStreaming(&.{});
+    var writer = file.writer(&.{});
     try writer.interface.print("{f}", .{std.json.fmt(save, .{})});
 }
 
@@ -323,12 +334,13 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     return allocator.dupe(u8, response[start..end]);
 }
 
-fn getToken(self: *Client, body: []u8) !?[]const u8 {
+fn getToken(self: *Client, payload: []const u8) !?[]const u8 {
     const uri = comptime try std.Uri.parse("https://accounts.spotify.com/api/token");
     var fba_buffer: [4096]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
     const auth_header = try std.fmt.allocPrint(fba.allocator(), "Basic {s}", .{self.basic_auth});
     var req = try self.http_client.request(.POST, uri, .{
+        .redirect_behavior = .unhandled,
         .headers = .{
             .authorization = .{ .override = auth_header },
             .content_type = .{ .override = "application/x-www-form-urlencoded" },
@@ -336,7 +348,12 @@ fn getToken(self: *Client, body: []u8) !?[]const u8 {
     });
     defer req.deinit();
 
-    try req.sendBodyComplete(body);
+    req.transfer_encoding = .{ .content_length = payload.len };
+    var body = try req.sendBodyUnflushed(&.{});
+    try body.writer.writeAll(payload);
+    try body.end();
+    try req.connection.?.flush();
+
     var response = try req.receiveHead(&.{});
 
     std.log.debug("getToken(): Response status: {t} ({d})", .{
@@ -344,8 +361,23 @@ fn getToken(self: *Client, body: []u8) !?[]const u8 {
         @intFromEnum(response.head.status),
     });
 
-    var buffer: [1024]u8 = undefined;
-    var json_reader: std.json.Reader = .init(fba.allocator(), response.reader(&buffer));
+    // usually compressed with gzip
+    var decompress_buffer: [std.compress.flate.max_window_len]u8 = undefined;
+    var transfer_buffer: [64]u8 = undefined;
+    var decompress: std.http.Decompress = undefined;
+    const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
+
+    // debug raw response
+    if (false) {
+        var stderr = std.fs.File.stderr().writer(&.{});
+        const response_writer = &stderr.interface;
+        _ = reader.streamRemaining(response_writer) catch |err| switch (err) {
+            error.ReadFailed => return response.bodyErr().?,
+            else => |e| return e,
+        };
+    }
+
+    var json_reader: std.json.Reader = .init(fba.allocator(), reader);
     defer json_reader.deinit();
 
     if (response.head.status != .ok) {

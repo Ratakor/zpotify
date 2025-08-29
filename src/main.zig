@@ -41,6 +41,9 @@ pub const usage =
 ;
 
 pub fn main() !void {
+    axe.init(std.heap.c_allocator, null, null) catch unreachable;
+    defer axe.deinit(std.heap.c_allocator);
+
     var args = std.process.args();
     std.debug.assert(args.skip());
     var command = args.next() orelse {
