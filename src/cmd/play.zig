@@ -3,7 +3,7 @@ const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
 pub const usage =
-    \\Usage: {s} play [track|playlist|album|artist]
+    \\Usage: zpotify play [track|playlist|album|artist]
     \\
     \\Description: Play a track, playlist, album, or artist from your library
     \\             If no arguments are provided, playback will be resumed for the current device
@@ -217,6 +217,9 @@ fn getItemFromMenu(
 fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]const u8 {
     const T = @typeInfo(@TypeOf(items)).pointer.child;
 
+    // buffer used for writing to the child process then reading from it
+    var common_buffer: [4096]u8 = undefined;
+
     // pipe[0] = read, pipe[1] = write
     const p2c_pipe = try std.posix.pipe(); // parent -> child
     const c2p_pipe = try std.posix.pipe(); // child -> parent
@@ -237,8 +240,8 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
     std.posix.close(p2c_pipe[0]);
     std.posix.close(c2p_pipe[1]);
 
-    var bw = std.io.bufferedWriter(std.fs.File.writer(.{ .handle = p2c_pipe[1] }));
-    const writer = bw.writer();
+    var p2c_writer = std.fs.File.writer(.{ .handle = p2c_pipe[1] }, &common_buffer);
+    const writer = &p2c_writer.interface;
     for (items) |item| {
         if (@hasField(T, "track")) {
             try writer.print("{s} - {s}\n", .{ item.track.artists[0].name, item.track.name });
@@ -251,7 +254,7 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
     if (T != api.Device) {
         try writer.writeAll("previous\nnext");
     }
-    try bw.flush();
+    try writer.flush();
     std.posix.close(p2c_pipe[1]);
 
     const wpr = std.posix.waitpid(fork_pid, 0);
@@ -260,20 +263,15 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
         std.process.exit(1);
     }
 
-    const reader = std.fs.File.reader(.{ .handle = c2p_pipe[0] });
-    var buf: [256]u8 = undefined;
-    var size = try reader.readAll(&buf);
+    var c2p_reader = std.fs.File.reader(.{ .handle = c2p_pipe[0] }, &common_buffer);
+    const item = try c2p_reader.interface.takeDelimiterExclusive('\n');
     std.posix.close(c2p_pipe[0]);
 
-    if (size > 0 and buf[size - 1] == '\n') {
-        size -= 1;
-    }
-
-    if (@hasField(@TypeOf(items[0]), "track") or @hasField(@TypeOf(items[0]), "album")) {
-        if (std.mem.indexOfScalar(u8, buf[0..size], '-')) |i| {
-            return allocator.dupe(u8, buf[i + 2 .. size]);
+    if (@hasField(T, "track") or @hasField(T, "album")) {
+        if (std.mem.indexOfScalar(u8, item, '-')) |i| {
+            return allocator.dupe(u8, item[i + 2..]);
         }
     }
 
-    return allocator.dupe(u8, buf[0..size]);
+    return allocator.dupe(u8, item);
 }

@@ -2,7 +2,7 @@ const std = @import("std");
 const api = @import("../api.zig");
 
 pub const usage =
-    \\Usage: {s} pause
+    \\Usage: zpotify pause
     \\
     \\Description: Toggle pause state
     \\

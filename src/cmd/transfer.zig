@@ -3,7 +3,7 @@ const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
 pub const usage =
-    \\Usage: {s} transfer [device]
+    \\Usage: zpotify transfer [device]
     \\
     \\Description: Transfer playback to another device
     \\             [device] can be the name or ID of an available device

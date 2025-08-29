@@ -1,6 +1,5 @@
 const std = @import("std");
 const api = @import("api.zig");
-const main = @import("main.zig");
 
 const Client = @This();
 
@@ -25,18 +24,21 @@ pub fn init(
     http_client_allocator: std.mem.Allocator,
     arena_child_allocator: std.mem.Allocator,
 ) !Client {
-    var buffer: [4096]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&buffer);
+    // why?... use the heap duh
+    var fba_buffer: [4096]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
+    const fba_allocator = fba.allocator();
     var arena = std.heap.ArenaAllocator.init(arena_child_allocator);
+    const arena_allocator = arena.allocator();
 
-    const save_path = try getSavePath(fba.allocator());
-    defer fba.allocator().free(save_path);
+    const save_path = try getSavePath(fba_allocator);
+    defer fba_allocator.free(save_path);
     const cwd = std.fs.cwd();
     const save_file = if (cwd.openFile(save_path, .{ .mode = .read_write })) |save_file| blk: {
         defer save_file.close();
-        var json_reader = std.json.reader(fba.allocator(), save_file.reader());
+        var json_reader = std.json.reader(fba_allocator, save_file.reader());
         defer json_reader.deinit();
-        if (std.json.parseFromTokenSourceLeaky(Save, arena.allocator(), &json_reader, .{})) |save_json| {
+        if (std.json.parseFromTokenSourceLeaky(Save, arena_allocator, &json_reader, .{})) |save_json| {
             return .{
                 .basic_auth = save_json.basic_auth,
                 .refresh_token = save_json.refresh_token,
@@ -59,29 +61,32 @@ pub fn init(
     errdefer cwd.deleteFile(save_path) catch {};
     defer save_file.close();
 
-    const stdout = std.io.getStdOut().writer();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
     try stdout.writeAll("Welcome to zpotify!\n");
     try stdout.writeAll("This is probably your first time running zpotify, so we need to authenticate with Spotify.\n");
     try stdout.writeAll("Go to https://developer.spotify.com/dashboard.\n");
     try stdout.writeAll("Create a new app, name and description doesn't matter but redirect URI must be '" ++ redirect_uri ++ "'.\n");
     try stdout.writeAll("Enter the following informations:\n");
-    const client_id = try getClientData("ID", fba.allocator());
-    defer fba.allocator().free(client_id);
-    const client_secret = try getClientData("Secret", fba.allocator());
-    defer fba.allocator().free(client_secret);
+    try stdout.flush();
+    const client_id = try getClientData("ID", fba_allocator);
+    defer fba_allocator.free(client_id);
+    const client_secret = try getClientData("Secret", fba_allocator);
+    defer fba_allocator.free(client_secret);
 
-    const auth_code = try oauth2(fba.allocator(), client_id);
-    defer fba.allocator().free(auth_code);
+    const auth_code = try oauth2(fba_allocator, client_id);
+    defer fba_allocator.free(auth_code);
 
     const basic_auth = blk: {
         var buf: [32 + 1 + 32]u8 = undefined;
         const source = try std.fmt.bufPrint(&buf, "{s}:{s}", .{ client_id, client_secret });
         var base64 = std.base64.standard.Encoder;
         const size = base64.calcSize(source.len);
-        const dest = try arena.allocator().alloc(u8, size);
+        const dest = try arena_allocator.alloc(u8, size);
         break :blk base64.encode(dest, source);
     };
-    errdefer arena.allocator().free(basic_auth);
+    errdefer arena_allocator.free(basic_auth); // ah yes the arena_allocator.free
 
     var client: Client = .{
         .basic_auth = basic_auth,
@@ -92,11 +97,11 @@ pub fn init(
         .arena = arena,
     };
     const body = try std.fmt.allocPrint(
-        fba.allocator(),
+        fba_allocator,
         "grant_type=authorization_code&code={s}&redirect_uri=" ++ redirect_uri,
         .{auth_code},
     );
-    defer fba.allocator().free(body);
+    defer fba_allocator.free(body);
     client.refresh_token = (try client.getToken(body)).?;
 
     try client.updateSaveFile(save_file);
@@ -217,12 +222,16 @@ fn updateSaveFile(self: Client, file: std.fs.File) !void {
 }
 
 fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+    var stdin_buffer: [64]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
+    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    const stdout = &stdout_writer.interface;
+
     const max_retries = 5;
-    const stdin = std.io.getStdIn().reader();
-    const stdout = std.io.getStdOut().writer();
     outer: for (0..max_retries) |_| {
         try stdout.print("Client {s}: ", .{name});
-        const data = stdin.readUntilDelimiterAlloc(allocator, '\n', 64) catch |err| switch (err) {
+        const data = stdin.takeDelimiterExclusive('\n') catch |err| switch (err) {
             error.StreamTooLong => {
                 std.log.warn("The client {s} must be 32 bytes long", .{name});
                 continue;
@@ -231,17 +240,15 @@ fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
         };
         if (data.len != 32) {
             std.log.warn("The client {s} must be 32 bytes long", .{name});
-            allocator.free(data);
             continue;
         }
         for (data) |byte| {
             if (!std.ascii.isHex(byte)) {
                 std.log.warn("The client {s} must be a hex string", .{name});
-                allocator.free(data);
                 continue :outer;
             }
         }
-        return data;
+        return allocator.dupe(u8, data);
     }
     std.log.err("Too many retries", .{});
     std.process.exit(1);
@@ -343,9 +350,7 @@ fn getToken(self: *Client, body: []const u8) !?[]const u8 {
         )) |json| {
             std.log.err("{?s} ({s})", .{ json.error_description, json.@"error" });
             if (std.mem.eql(u8, json.@"error", "invalid_grant")) {
-                std.log.info("Please try again and if the problem persists run `{s} logout`", .{
-                    main.progname,
-                });
+                std.log.info("Please try again and if the problem persists run `zpotify logout`", .{});
             }
         } else |err| {
             std.log.err("Failed to parse the error response: {}", .{err});

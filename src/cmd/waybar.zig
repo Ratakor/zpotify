@@ -1,9 +1,10 @@
 const std = @import("std");
+const axe = @import("../main.zig").axe;
 const api = @import("../api.zig");
 const writeTime = @import("../cmd.zig").print.writeTime;
 
 pub const usage =
-    \\Usage: {s} waybar
+    \\Usage: zpotify waybar
     \\
     \\Description: Display infos about the current playback every second for use in a waybar module
     \\
@@ -26,20 +27,26 @@ pub const usage =
 const bar_len = 40;
 
 pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
-    const stdout = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout);
-    const writer = bw.writer();
+    // is buffering needed?
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    // arena is reset on each loop iteration, there is no need to call deinit or free
     var arena = std.heap.ArenaAllocator.init(child_allocator);
     const allocator = arena.allocator();
 
+    // disable colored logs
+    axe.updateTtyConfig(.never);
+
     while (true) {
-        defer std.time.sleep(std.time.ns_per_s);
+        defer std.Thread.sleep(std.time.ns_per_s);
         defer stdout.writeAll("\n") catch {};
 
         const info = api.getPlaybackStateOwned(client, allocator) catch |err| switch (err) {
             error.PlaybackNotAvailable => continue,
             else => {
-                std.log.err("zpotify: {}", .{err});
+                std.log.scoped(.zpotify).err("{t}", .{err});
                 continue;
             },
         };
@@ -49,55 +56,54 @@ pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
         const track = info.item orelse continue;
 
         const text = blk: {
-            var builder = std.ArrayList(u8).init(allocator);
-            defer builder.deinit();
-            try builder.appendSlice(if (info.is_playing) "" else "");
-            try builder.append(' ');
-            try builder.appendSlice(track.artists[0].name);
-            try builder.appendSlice(" - ");
-            try builder.appendSlice(track.name);
-            break :blk try std.mem.replaceOwned(u8, allocator, builder.items, "&", "&amp;");
+            var builder: std.Io.Writer.Allocating = .init(allocator);
+            const writer = &builder.writer;
+            try writer.writeAll(if (info.is_playing) "" else "");
+            try writer.writeAll(" ");
+            try writer.writeAll(track.artists[0].name);
+            try writer.writeAll(" - ");
+            try writer.writeAll(track.name);
+            break :blk try std.mem.replaceOwned(u8, allocator, writer.buffered(), "&", "&amp;");
         };
 
         const tooltip = blk: {
-            var builder = std.ArrayList(u8).init(allocator);
-            defer builder.deinit();
-            const builder_writer = builder.writer();
-            try builder.appendSlice("Track: ");
-            try builder.appendSlice(track.name);
+            var builder: std.Io.Writer.Allocating = .init(allocator);
+            const writer = &builder.writer;
+            try writer.writeAll("Track: ");
+            try writer.writeAll(track.name);
             if (track.artists.len == 1) {
-                try builder.appendSlice("\nArtist: ");
-                try builder.appendSlice(track.artists[0].name);
+                try writer.writeAll("\nArtist: ");
+                try writer.writeAll(track.artists[0].name);
             } else {
-                try builder.appendSlice("\nArtists: ");
-                try builder.appendSlice(track.artists[0].name);
+                try writer.writeAll("\nArtists: ");
+                try writer.writeAll(track.artists[0].name);
                 for (track.artists[1..]) |artist| {
-                    try builder.appendSlice(", ");
-                    try builder.appendSlice(artist.name);
+                    try writer.writeAll(", ");
+                    try writer.writeAll(artist.name);
                 }
             }
-            try builder.appendSlice("\nAlbum: ");
-            try builder.appendSlice(track.album.name);
-            try builder.appendSlice("\nDevice: ");
-            try builder.appendSlice(device.name);
-            try builder.appendSlice("\nProgress: ");
+            try writer.writeAll("\nAlbum: ");
+            try writer.writeAll(track.album.name);
+            try writer.writeAll("\nDevice: ");
+            try writer.writeAll(device.name);
+            try writer.writeAll("\nProgress: ");
             const progress_len = (info.progress_ms * bar_len) / track.duration_ms;
-            try builder_writer.writeBytesNTimes("█", progress_len);
-            try builder_writer.writeByteNTimes(' ', bar_len - progress_len + 1);
-            try writeTime(builder_writer, info.progress_ms);
-            try builder.appendSlice(" / ");
-            try writeTime(builder_writer, track.duration_ms);
-            try builder.appendSlice("\nShuffle: ");
-            try builder.appendSlice(if (info.shuffle_state) "on" else "off");
-            try builder.appendSlice("\t\tVolume: ");
-            try builder_writer.print("{?d}%\t", .{device.volume_percent});
-            try builder_writer.writeByteNTimes(' ', 14 - info.repeat_state.len);
-            try builder.appendSlice("Repeat: ");
-            try builder.appendSlice(info.repeat_state);
-            break :blk try std.mem.replaceOwned(u8, allocator, builder.items, "&", "&amp;");
+            try writer.splatBytesAll("█", progress_len);
+            try writer.splatByteAll(' ', bar_len - progress_len + 1);
+            try writeTime(writer, info.progress_ms);
+            try writer.writeAll(" / ");
+            try writeTime(writer, track.duration_ms);
+            try writer.writeAll("\nShuffle: ");
+            try writer.writeAll(if (info.shuffle_state) "on" else "off");
+            try writer.writeAll("\t\tVolume: ");
+            try writer.print("{?d}%\t", .{device.volume_percent});
+            try writer.splatByteAll(' ', 14 - info.repeat_state.len);
+            try writer.writeAll("Repeat: ");
+            try writer.writeAll(info.repeat_state);
+            break :blk try std.mem.replaceOwned(u8, allocator, writer.buffered(), "&", "&amp;");
         };
 
-        try std.json.stringify(.{ .text = text, .tooltip = tooltip }, .{}, writer);
-        try bw.flush();
+        try stdout.print("{f}", .{std.json.fmt(.{ .text = text, .tooltip = tooltip }, .{})});
+        try stdout.flush();
     }
 }

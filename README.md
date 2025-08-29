@@ -39,7 +39,7 @@ Commands:
   repeat     | Get/Set repeat mode
   shuffle    | Toggle shuffle mode
   seek       | Get/Set the position of the current track
-  vol        | Get/Set volume or increase/decrease volume by 10%
+  volume     | Get/Set volume or increase/decrease volume by 10%
   like       | Add the current track to your liked songs
   queue      | Display tracks in the queue
   devices    | List all available devices
@@ -92,7 +92,7 @@ Benchmark 2 (43 runs): ./run zpotify
 ## TODO
 - make image support optional via a compile option
 - autogen zsh completions
-- custom nix flake instead of using zig2nix?
+- add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
 - add `zpotify play liked` cmd which play liked songs
 - add a way to save track / album to a playlist
 - embed [librespot](https://github.com/librespot-org/librespot) or add a wrapper like [librespot-cfg](https://gist.github.com/Ratakor/7dab4b17311a5c60d3b36ad34a02388a)

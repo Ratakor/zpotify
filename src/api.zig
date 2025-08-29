@@ -314,20 +314,20 @@ pub fn startPlayback(
     device_id: ?[]const u8,
 ) !void {
     var buf: [4096]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(buf[0..]);
+    var writer = std.Io.Writer.fixed(buf[0..]);
     const body = blk: {
         if (data) |uri| {
-            try std.json.stringify(uri, .{}, fbs.writer());
-            break :blk fbs.getWritten();
+            try writer.print("{f}", .{std.json.fmt(uri, .{})});
+            break :blk writer.buffered();
         } else {
             break :blk "{}";
         }
     };
 
     if (device_id) |id| {
-        fbs = std.io.fixedBufferStream(buf[body.len..]);
-        try fbs.writer().print(api_url ++ "/me/player/play?device_id={s}", .{id});
-        const url = fbs.getWritten();
+        writer = std.Io.Writer.fixed(buf[body.len..]);
+        try writer.print(api_url ++ "/me/player/play?device_id={s}", .{id});
+        const url = writer.buffered();
         return client.sendRequest(void, .PUT, url, body);
     } else {
         return client.sendRequest(void, .PUT, api_url ++ "/me/player/play", body);

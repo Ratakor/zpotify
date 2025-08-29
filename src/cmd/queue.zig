@@ -2,13 +2,13 @@ const std = @import("std");
 const api = @import("../api.zig");
 
 pub const usage =
-    \\Usage: {s} queue
+    \\Usage: zpotify queue
     \\
     \\Description: Display tracks in the queue
     \\
 ;
 
-fn printTrack(writer: anytype, track: api.Track) !void {
+fn printTrack(writer: *std.Io.Writer, track: api.Track) !void {
     try writer.print("{s} by ", .{track.name});
     for (track.artists, 0..) |artist, i| {
         if (i > 0) {
@@ -22,26 +22,26 @@ fn printTrack(writer: anytype, track: api.Track) !void {
 pub fn exec(client: *api.Client) !void {
     const queue = try api.getQueue(client);
 
-    const stdout = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout);
-    const writer = bw.writer();
+    var stdout_buffer: [4096]u8 = undefined;
+    const stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
     if (queue.currently_playing) |track| {
-        try writer.writeAll("Currently playing: ");
-        try printTrack(writer, track);
+        try stdout.writeAll("Currently playing: ");
+        try printTrack(stdout, track);
     }
 
     if (queue.queue.len == 0) {
-        try writer.writeAll("Queue is empty\n");
-        try bw.flush();
+        try stdout.writeAll("Queue is empty\n");
+        try stdout.flush();
         return;
     }
 
-    try writer.writeAll("Queue:\n");
+    try stdout.writeAll("Queue:\n");
     for (queue.queue, 1..) |track, i| {
-        try writer.print("  Track {d}: ", .{i});
-        try printTrack(writer, track);
+        try stdout.print("  Track {d}: ", .{i});
+        try printTrack(stdout, track);
     }
 
-    try bw.flush();
+    try stdout.flush();
 }

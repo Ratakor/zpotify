@@ -2,7 +2,7 @@ const std = @import("std");
 const api = @import("../api.zig");
 
 pub const usage =
-    \\Usage: {s} prev
+    \\Usage: zpotify prev
     \\
     \\Description: Skip to previous track
     \\

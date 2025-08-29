@@ -3,7 +3,7 @@ const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
 pub const usage =
-    \\Usage: {s} shuffle [on|off]
+    \\Usage: zpotify shuffle [on|off]
     \\
     \\Description: Toggle shuffle mode or force it to a specific state
     \\

@@ -3,7 +3,7 @@ const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
 pub const usage =
-    \\Usage: {s} print [format]...
+    \\Usage: zpotify print [format]...
     \\
     \\Description: Display current track info in a specific format
     \\
@@ -60,24 +60,24 @@ fn escapeDefaultFormat() []const u8 {
 pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
     const playback_state = try api.getPlaybackState(client);
 
-    const stdout = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout);
-    const writer = bw.writer();
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
     if (args.next()) |arg2| {
-        try format(writer, arg2, playback_state);
+        try format(stdout, arg2, playback_state);
         while (args.next()) |arg| {
-            try writer.writeAll(" ");
-            try format(writer, arg, playback_state);
+            try stdout.writeAll(" ");
+            try format(stdout, arg, playback_state);
         }
     } else {
-        try format(writer, default_format, playback_state);
+        try format(stdout, default_format, playback_state);
     }
 
-    try bw.flush();
+    try stdout.flush();
 }
 
-fn format(writer: anytype, fmt: []const u8, info: api.PlaybackState) !void {
+fn format(writer: *std.Io.Writer, fmt: []const u8, info: api.PlaybackState) !void {
     var i: usize = 0;
     while (i < fmt.len) : (i += 1) {
         switch (fmt[i]) {
@@ -154,7 +154,7 @@ fn hexToInt(c: u8) u8 {
     };
 }
 
-fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !void {
+fn handleFormatArg(writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackState) !void {
     if (std.mem.eql(u8, arg, "title")) {
         if (info.item) |track| {
             try writer.print("{s}", .{track.name});
@@ -256,8 +256,8 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
             const duration = track.duration_ms;
             const progress = info.progress_ms;
             const progress_len = (progress * bar_len) / duration;
-            try writer.writeBytesNTimes("█", progress_len);
-            try writer.writeByteNTimes(' ', bar_len - progress_len);
+            try writer.splatBytesAll("█", progress_len);
+            try writer.splatByteAll(' ', bar_len - progress_len);
         }
     } else if (std.mem.eql(u8, arg, "image")) {
         if (info.item) |track| {
@@ -280,7 +280,7 @@ fn handleFormatArg(writer: anytype, arg: []const u8, info: api.PlaybackState) !v
     }
 }
 
-pub fn writeTime(writer: anytype, ms: u64) !void {
+pub fn writeTime(writer: *std.Io.Writer, ms: u64) !void {
     const min = ms / std.time.ms_per_min;
     const s = (ms / std.time.ms_per_s) % std.time.s_per_min;
     try writer.print("{d}:{d:0>2}", .{ min, s });

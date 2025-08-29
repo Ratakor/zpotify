@@ -1,12 +1,11 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const axe = @import("axe").Axe(.{
-    .scope_format = "@%",
-    .mutex = .{ .function = .progress_stderr },
-});
 const Client = @import("Client.zig");
 const cmd = @import("cmd.zig");
 
+pub const axe = @import("axe").Axe(.{
+    .mutex = .{ .function = .progress_stderr },
+});
 
 pub const std_options: std.Options = .{
     .log_level = if (builtin.mode == .Debug) .debug else .info,
@@ -15,11 +14,9 @@ pub const std_options: std.Options = .{
 
 // TODO: use build_options instead
 pub const version = "0.3.0";
-// TODO: hard code that
-pub var progname: []const u8 = undefined;
 
 pub const usage =
-    \\Usage: {s} [command] [options]
+    \\Usage: zpotify [command] [options]
     \\
     \\Commands:
     \\  print      | Display current track info in a specific format
@@ -31,7 +28,7 @@ pub const usage =
     \\  repeat     | Get/Set repeat mode
     \\  shuffle    | Toggle shuffle mode or force it to a specific state
     \\  seek       | Get/Set the position of the current track
-    \\  vol        | Get/Set volume or increase/decrease volume by 10%
+    \\  volume     | Get/Set volume or increase/decrease volume by 10%
     \\  like       | Add the current track to your liked songs
     \\  queue      | Display tracks in the queue
     \\  devices    | List all available devices
@@ -45,9 +42,9 @@ pub const usage =
 
 pub fn main() !void {
     var args = std.process.args();
-    progname = args.next().?;
+    std.debug.assert(args.skip());
     var command = args.next() orelse {
-        cmd.help.exec(null);
+        try cmd.help.exec(null);
         std.process.exit(1);
     };
 
@@ -85,7 +82,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "seek")) {
         return cmd.seek.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "vol") or std.mem.eql(u8, command, "volume")) {
-        return cmd.vol.exec(&client, args.next());
+        return cmd.volume.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "like")) {
         return cmd.like.exec(&client);
     } else if (std.mem.eql(u8, command, "queue")) {
@@ -97,7 +94,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "waybar")) {
         return cmd.waybar.exec(&client, std.heap.raw_c_allocator);
     } else {
-        cmd.help.exec(command);
+        try cmd.help.exec(command);
         std.process.exit(1);
     }
 }

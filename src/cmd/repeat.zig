@@ -3,7 +3,7 @@ const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
 pub const usage =
-    \\Usage: {s} repeat [track|context|off]
+    \\Usage: zpotify repeat [track|context|off]
     \\
     \\Description: Get/Set repeat mode
     \\

@@ -3,7 +3,7 @@ const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
 pub const usage =
-    \\Usage: {s} seek [time]
+    \\Usage: zpotify seek [time]
     \\
     \\Description: Get/Set the position of the current track in seconds or minutes:seconds format
     \\
