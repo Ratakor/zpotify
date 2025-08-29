@@ -32,7 +32,6 @@ const debug = std.debug;
 /// TODO graphemes, emoji, double wide characters and similar pain :(
 const RestrictedPaddingWriter = @This();
 
-
 // FIXME:
 // use this instead of restricted_padding_writer even though this is probably
 // not how we're supposed to deal with the new interface :P
@@ -189,7 +188,6 @@ fn maybeWriteByte(self: *RestrictedPaddingWriter, b: u8, remaining_bytes_len: us
         self.codepoint_holding_area = CodepointStagingArea.new(byte, 1);
     }
 }
-
 
 const CodepointStagingArea = struct {
     const Self = @This();

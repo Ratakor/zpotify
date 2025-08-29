@@ -140,7 +140,7 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
     };
     defer allocator.free(jpeg_image);
 
-    var pixels: ?[]const u8 = null;
+    var pixels: ?[]u8 = null;
 
     var cinfo: c.jpeg_decompress_struct = undefined;
     c.jpeg_create_decompress(&cinfo);
@@ -171,7 +171,7 @@ pub fn fetchImage(allocator: std.mem.Allocator, url: []const u8) !Image {
 
     var index: usize = 0;
     while (index != pixels.?.len) {
-        const amt = c.jpeg_read_scanlines(&cinfo, @constCast(@ptrCast(&pixels.?.ptr[index..])), 1);
+        const amt = c.jpeg_read_scanlines(&cinfo, @ptrCast(@constCast(&pixels.?.ptr[index..])), 1);
         if (amt == 0) return error.FailedToReadImage;
         index += amt * row_stride;
     }
