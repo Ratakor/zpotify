@@ -296,10 +296,11 @@ pub fn search(
     offset: u64, // index of first result to return (default 0)
 ) !Search {
     var buf: [4096]u8 = undefined;
+    const uri_component: std.Uri.Component = .{ .raw = query };
     const url = try std.fmt.bufPrint(
         &buf,
-        api_url ++ "/search?q={query}&type={s}&limit={d}&offset={d}",
-        .{ std.Uri.Component{ .raw = query }, types, limit, offset },
+        api_url ++ "/search?q={f}&type={s}&limit={d}&offset={d}",
+        .{ std.fmt.alt(uri_component, .formatQuery), types, limit, offset },
     );
     return client.sendRequest(Search, .GET, url, null);
 }

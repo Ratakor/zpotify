@@ -24,7 +24,6 @@ pub fn init(
     http_client_allocator: std.mem.Allocator,
     arena_child_allocator: std.mem.Allocator,
 ) !Client {
-    // why?... use the heap duh
     var fba_buffer: [4096]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
     const fba_allocator = fba.allocator();
@@ -88,7 +87,6 @@ pub fn init(
         const dest = try arena_allocator.alloc(u8, size);
         break :blk base64.encode(dest, source);
     };
-    errdefer arena_allocator.free(basic_auth); // ah yes the arena_allocator.free
 
     var client: Client = .{
         .basic_auth = basic_auth,
@@ -137,6 +135,7 @@ pub inline fn sendRequest(
     return self.sendRequestOwned(T, method, url, body, self.arena.allocator());
 }
 
+// FIXME: all FIXME here should be handled for getToken() too
 pub fn sendRequestOwned(
     self: *Client,
     comptime T: type,
@@ -149,33 +148,41 @@ pub fn sendRequestOwned(
     var fba_buffer: [4096]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
     const auth_header = try self.getAuthHeader(fba.allocator());
-    var header_buf: [4096]u8 = undefined;
-    var req = try self.http_client.open(method, uri, .{
-        .server_header_buffer = &header_buf,
+    var req = try self.http_client.request(method, uri, .{
         .headers = .{ .authorization = .{ .override = auth_header } },
     });
     defer req.deinit();
-    if (body) |b| {
-        req.transfer_encoding = .{ .content_length = b.len };
-    }
-    try req.send();
-    if (body) |b| {
-        try req.writeAll(b);
-        try req.finish();
-    }
-    try req.wait();
 
-    std.log.debug("sendRequest({}, {s}): Response status: {s} ({d})", .{
+    if (body) |b| {
+        try req.sendBodyComplete(@constCast(b)); // FIXME this should be fine but consider make body ?[]u8
+    } else {
+        try req.sendBodiless();
+    }
+    var response = try req.receiveHead(&.{}); // FIXME does this need redirect buffer?
+
+    // FIXME: remove that
+    var it = response.head.iterateHeaders();
+    while (it.next()) |header| {
+        std.log.debug("sendRequest({}, {s}): Response header: {s}: {s}", .{
+            method,
+            url,
+            header.name,
+            header.value,
+        });
+    }
+
+    std.log.debug("sendRequest({}, {s}): Response status: {t} ({d})", .{
         method,
         url,
-        @tagName(req.response.status),
-        @intFromEnum(req.response.status),
+        response.head.status,
+        @intFromEnum(response.head.status),
     });
 
-    switch (req.response.status) {
+    switch (response.head.status) {
         .ok => {
             if (T != void) {
-                var json_reader = std.json.reader(fba.allocator(), req.reader());
+                var buffer: [1024]u8 = undefined;
+                var json_reader: std.json.Reader = .init(fba.allocator(), response.reader(&buffer));
                 return std.json.parseFromTokenSourceLeaky(T, arena_allocator, &json_reader, .{
                     .allocate = .alloc_always,
                     .ignore_unknown_fields = true,
@@ -196,7 +203,8 @@ pub fn sendRequestOwned(
                     reason: ?[]const u8 = null,
                 },
             };
-            var json_reader = std.json.reader(fba.allocator(), req.reader());
+            var buffer: [1024]u8 = undefined;
+            var json_reader: std.json.Reader = .init(fba.allocator(), response.reader(&buffer));
             if (std.json.parseFromTokenSourceLeaky(
                 Error,
                 fba.allocator(),
@@ -220,7 +228,10 @@ fn updateSaveFile(self: Client, file: std.fs.File) !void {
         .expiration = self.expiration,
     };
     try file.seekTo(0);
-    try std.json.stringify(save, .{}, file.writer());
+    var writer = file.writerStreaming(&.{});
+    // FIXME does this work?
+    // var writer = file.writer(&.{});
+    try writer.interface.print("{f}", .{std.json.fmt(save, .{})});
 }
 
 fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
@@ -312,35 +323,32 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     return allocator.dupe(u8, response[start..end]);
 }
 
-fn getToken(self: *Client, body: []const u8) !?[]const u8 {
-    const uri = try std.Uri.parse("https://accounts.spotify.com/api/token");
+fn getToken(self: *Client, body: []u8) !?[]const u8 {
+    const uri = comptime try std.Uri.parse("https://accounts.spotify.com/api/token");
     var fba_buffer: [4096]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
     const auth_header = try std.fmt.allocPrint(fba.allocator(), "Basic {s}", .{self.basic_auth});
-    var header_buf: [4096]u8 = undefined;
-    var req = try self.http_client.open(.POST, uri, .{
-        .server_header_buffer = &header_buf,
+    var req = try self.http_client.request(.POST, uri, .{
         .headers = .{
             .authorization = .{ .override = auth_header },
             .content_type = .{ .override = "application/x-www-form-urlencoded" },
         },
     });
     defer req.deinit();
-    req.transfer_encoding = .{ .content_length = body.len };
-    try req.send();
-    try req.writeAll(body);
-    try req.finish();
-    try req.wait();
 
-    std.log.debug("getToken(): Response status: {s} ({d})", .{
-        @tagName(req.response.status),
-        @intFromEnum(req.response.status),
+    try req.sendBodyComplete(body);
+    var response = try req.receiveHead(&.{});
+
+    std.log.debug("getToken(): Response status: {t} ({d})", .{
+        response.head.status,
+        @intFromEnum(response.head.status),
     });
 
-    var json_reader = std.json.reader(fba.allocator(), req.reader());
+    var buffer: [1024]u8 = undefined;
+    var json_reader: std.json.Reader = .init(fba.allocator(), response.reader(&buffer));
     defer json_reader.deinit();
 
-    if (req.response.status != .ok) {
+    if (response.head.status != .ok) {
         const AuthError = struct {
             @"error": []const u8,
             error_description: ?[]const u8 = null,
