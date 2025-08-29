@@ -17,7 +17,7 @@
 const builtin = @import("builtin");
 const std = @import("std");
 const ascii = std.ascii;
-const io = std.io;
+const Io = std.Io;
 const mem = std.mem;
 const os = std.posix.system;
 const WriteError = std.posix.WriteError;
@@ -60,15 +60,19 @@ currently_rendering: bool = false,
 tty: ?os.fd_t = null,
 
 /// Dumb writer. Don't use.
-const Writer = io.Writer(os.fd_t, WriteError, std.posix.write);
+// TODO: use Io.Writer instead
+const Writer = Io.GenericWriter(os.fd_t, WriteError, std.posix.write);
 fn writer(self: Self) Writer {
     return .{ .context = self.tty.? };
 }
 
 /// Buffered writer. Use.
-const BufferedWriter = io.BufferedWriter(4096, Writer);
+// TODO: merge with above
+const BufferedWriter = Writer;
+// const BufferedWriter = Io.BufferedWriter(4096, Writer);
 fn bufferedWriter(self: Self) BufferedWriter {
-    return io.bufferedWriter(self.writer());
+    // return Io.bufferedWriter(self.writer());
+    return self.writer();
 }
 
 pub fn init(self: *Self, term_config: TermConfig) !void {
