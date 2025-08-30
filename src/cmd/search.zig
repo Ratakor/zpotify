@@ -78,7 +78,7 @@ pub fn exec(
 
 fn loop() !void {
     var fds = [1]std.posix.pollfd{.{
-        .fd = ui.term.tty.?,
+        .fd = ui.term.tty,
         .events = std.posix.POLL.IN,
         .revents = undefined,
     }};
@@ -191,7 +191,8 @@ fn loop() !void {
 }
 
 fn render() !void {
-    var rc = try ui.term.getRenderContext();
+    var rendering_buffer: [16 * 1024]u8 = undefined;
+    var rc = try ui.term.getRenderContext(&rendering_buffer);
     defer rc.done() catch {};
 
     try rc.clear();
@@ -218,7 +219,7 @@ fn drawHeader(rc: *spoon.Term.RenderContext, header: []const u8) !void {
     try rc.moveCursorTo(0, 0);
     try rc.setAttribute(.{ .fg = .green, .reverse = true, .bold = true });
     var rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().writeAll(header);
+    try rpw.interface.writeAll(header);
     try rpw.pad();
 }
 
@@ -227,10 +228,10 @@ fn drawFooter(rc: *spoon.Term.RenderContext, footer: []const u8) !void {
     try rc.setAttribute(.{ .fg = .none, .bold = true });
     var rpw = rc.restrictedPaddingWriter(ui.term.width);
     if (devices.items) |items| {
-        try rpw.writer().print("Showing {0d} of {0d} devices", .{items.len});
+        try rpw.interface.print("Showing {0d} of {0d} devices", .{items.len});
     } else {
         const kind = @tagName(current_table.list);
-        try rpw.writer().print("Showing {d} of {d} {s}", .{
+        try rpw.interface.print("Showing {d} of {d} {s}", .{
             current_table.len(),
             current_table.total,
             kind[0 .. kind.len - @intFromBool(current_table.len() == 1)],
@@ -241,12 +242,13 @@ fn drawFooter(rc: *spoon.Term.RenderContext, footer: []const u8) !void {
     try rc.moveCursorTo(ui.term.height - 1, 0);
     try rc.setAttribute(.{ .fg = .none, .bg = .cyan });
     rpw = rc.restrictedPaddingWriter(ui.term.width);
-    try rpw.writer().writeAll(footer);
+    try rpw.interface.writeAll(footer);
     try rpw.pad();
 }
 
 fn notify(level: enum { err, info }, comptime fmt: []const u8, args: anytype) !void {
-    var rc = try ui.term.getRenderContext();
+    var buffer: [256]u8 = undefined;
+    var rc = try ui.term.getRenderContext(&buffer);
     defer rc.done() catch {};
 
     try rc.moveCursorTo(ui.term.height - 1, 0);
@@ -255,7 +257,7 @@ fn notify(level: enum { err, info }, comptime fmt: []const u8, args: anytype) !v
         .err => try rc.setAttribute(.{ .fg = .none, .bg = .red, .bold = true }),
         .info => try rc.setAttribute(.{ .fg = .none, .bg = .blue, .bold = true }),
     }
-    try rpw.writer().print(fmt, args);
+    try rpw.interface.print(fmt, args);
     try rpw.pad();
 }
 
@@ -303,7 +305,7 @@ fn playFallback() !void {
         }
 
         var fds = [1]std.posix.pollfd{.{
-            .fd = ui.term.tty.?,
+            .fd = ui.term.tty,
             .events = std.posix.POLL.IN,
             .revents = undefined,
         }};

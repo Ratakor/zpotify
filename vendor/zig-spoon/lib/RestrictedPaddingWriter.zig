@@ -78,6 +78,8 @@ pub fn getRemaining(self: *RestrictedPaddingWriter) Io.Writer.Error!usize {
     return self.len_left;
 }
 
+// based on std.Io.GenericWriter().Adapter.drain
+// implies no buffering
 fn drain(w: *Io.Writer, data: []const []const u8, splat: usize) Io.Writer.Error!usize {
     _ = splat;
     const self: *RestrictedPaddingWriter = @alignCast(@fieldParentPtr("interface", w));

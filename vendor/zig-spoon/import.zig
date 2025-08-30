@@ -23,15 +23,11 @@ pub const Term = @import("lib/Term.zig");
 pub const inputParser = @import("lib/input.zig").inputParser;
 pub const Input = @import("lib/input.zig").Input;
 pub const InputContent = @import("lib/input.zig").InputContent;
-
-pub const restrictedPaddingWriter = @import("lib/restricted_padding_writer.zig").restrictedPaddingWriter;
-pub const RestrictedPaddingWriter = @import("lib/restricted_padding_writer.zig").RestrictedPaddingWriter;
-// pub const RestrictedPaddingWriter = @import("lib/RestrictedPaddingWriter.zig");
+pub const RestrictedPaddingWriter = @import("lib/RestrictedPaddingWriter.zig");
 
 test {
     _ = @import("lib/input.zig");
     _ = @import("lib/input_description.zig");
     _ = @import("lib/colour_description.zig");
-    _ = @import("lib/restricted_padding_writer.zig");
-    // _ = @import("lib/RestrictedPaddingWriter.zig");
+    _ = @import("lib/RestrictedPaddingWriter.zig");
 }

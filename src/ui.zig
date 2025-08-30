@@ -585,7 +585,7 @@ fn makeDrawFn(
                 } else {
                     try rc.setAttribute(.{ .fg = .none });
                 }
-                try rpw.writer().writeAll("No image");
+                try rpw.interface.writeAll("No image");
                 try rpw.finish();
             }
         }
@@ -595,7 +595,7 @@ fn makeDrawFn(
 
             try rc.moveCursorTo(row, 0);
             var rpw = rc.restrictedPaddingWriter(term.width);
-            const writer = rpw.writer();
+            const writer = &rpw.interface;
             try writer.writeAll(title);
             try rpw.finish();
 
@@ -632,7 +632,7 @@ fn makeDrawFn(
             for (items, first_row..) |item, row| {
                 try rc.moveCursorTo(row, 0);
                 var rpw = rc.restrictedPaddingWriter(term.width);
-                const writer = rpw.writer();
+                const writer = &rpw.interface;
 
                 if (row == selected_row) {
                     try rc.setAttribute(.{ .reverse = true, .fg = .none });
@@ -704,7 +704,7 @@ fn makeDrawFn(
             var x: usize = start_x;
             while (iter.next()) |line| : (x += 1) {
                 try rc.moveCursorTo(x, y);
-                try rc.buffer.writer().writeAll(line);
+                try rc.interface.writeAll(line);
             }
         }
 

@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const std = @import("std");
+
 const Self = @This();
 
 pub const Colour = union(enum) {
@@ -65,7 +67,7 @@ pub fn eql(self: Self, other: Self) bool {
     return true;
 }
 
-pub fn dump(self: Self, writer: anytype) !void {
+pub fn dump(self: Self, writer: *std.Io.Writer) !void {
     try writer.writeAll("\x1B[0");
     if (self.bold) try writer.writeAll(";1");
     if (self.dimmed) try writer.writeAll(";2");
