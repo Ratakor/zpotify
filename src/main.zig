@@ -20,7 +20,7 @@ pub const usage = blk: {
         \\
     ;
     for (std.meta.declarations(cmd)) |decl| {
-        str = str ++ std.fmt.comptimePrint("  {s: <10} {s}\n", .{
+        str = str ++ std.fmt.comptimePrint("  {s: <10}  {s}\n", .{
             decl.name,
             @field(cmd, decl.name).description,
         });
@@ -49,6 +49,8 @@ pub fn main() !void {
         return cmd.help.exec(args.next());
     } else if (std.mem.eql(u8, command, "version")) {
         return cmd.version.exec();
+    } else if (std.mem.eql(u8, command, "completion")) {
+        return cmd.completion.exec(args.next());
     }
 
     var client = try Client.init(std.heap.c_allocator, std.heap.raw_c_allocator);

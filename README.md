@@ -5,9 +5,10 @@ https://github.com/user-attachments/assets/5a97453a-db8a-4689-b2d0-ab1f2009fcb0
 
 ## Installation
 
-### [AUR](https://aur.archlinux.org/packages/zpotify)
+### [AUR](https://aur.archlinux.org/packages/zpotify) [deprecated]
 
 Using your favorite AUR helper or manually:
+
 ```
 git clone https://aur.archlinux.org/zpotify
 cd zpotify
@@ -16,43 +17,49 @@ makepkg -si
 
 ### Building
 
-Requires zig 0.14.1, libjpeg and chafa.
+Requires zig 0.15.1, libjpeg and chafa.
+
 ```
 git clone https://github.com/ratakor/zpotify
 cd zpotify
 zig build -Doptimize=ReleaseSafe
 ```
-Zsh completions are available [here](_zpotify)!
+
+Shell completions are auto-generated with `zpotify completion [shell]`!
 
 ## Usage
+
 Requires Spotify premium.
+
 ```
 Usage: zpotify [command] [options]
 
 Commands:
-  print      | Display current track info in a specific format
-  search     | Search a track, playlist, album, or artist with a TUI
-  play       | Play a track, playlist, album, or artist from your library
-  pause      | Toggle pause state
-  prev       | Skip to previous track
-  next       | Skip to next track
-  repeat     | Get/Set repeat mode
-  shuffle    | Toggle shuffle mode
-  seek       | Get/Set the position of the current track
-  volume     | Get/Set volume or increase/decrease volume by 10%
-  like       | Add the current track to your liked songs
-  queue      | Display tracks in the queue
-  devices    | List all available devices
-  transfer   | Transfer playback to another device
-  waybar     | Display infos about the current playback for a waybar module
-  logout     | Remove the stored credentials from the config file
-  help       | Display information about a command
-  version    | Display program version
+  print       Display current track info in a specific format
+  search      Search a track, playlist, album, or artist with a TUI
+  play        Play a track, playlist, album, or artist from your library
+  pause       Toggle pause state
+  prev        Skip to previous track
+  next        Skip to next track
+  repeat      Get/Set repeat mode
+  shuffle     Toggle shuffle mode or force it to a specific state
+  seek        Get/Set the position of the current track
+  volume      Get/Set volume or increase/decrease volume by 10%
+  like        Add the current track to your liked songs
+  queue       Display tracks in the queue
+  devices     List all available devices
+  transfer    Transfer playback to another device
+  waybar      Display infos about the current playback for a waybar module
+  logout      Remove the stored credentials from the config file
+  completion  Generate shell completion script
+  help        Display information about a command
+  version     Display program version
 ```
 
 ## Performance
 
 More than 2x times faster than the only good alternative [baton](https://github.com/joshuathompson/baton)!
+
 ```
 % cat run
 #!/bin/sh
@@ -85,15 +92,16 @@ Benchmark 2 (43 runs): ./run zpotify
 ```
 
 ## Credits
+
 - [baton](https://github.com/joshuathompson/baton)
 - [zig-spoon](https://git.sr.ht/~leon_plickat/zig-spoon)
 - [chafa](https://github.com/hpjansson/chafa)
 
 ## TODO
+
 - fix notification footer growing when going up (bug introduced in v0.4.0 with zig 0.15 rewrite)
-- remove usage of std.Io.GenericWriter in spoon
+- fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
 - make image support optional via a compile option
-- autogen zsh completions
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
 - add `zpotify play liked` cmd which play liked songs
 - add a way to save track / album to a playlist

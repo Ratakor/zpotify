@@ -3,6 +3,7 @@ const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
 pub const description = "Display current track info in a specific format";
+// format options must be kept in sync with completion.zig
 pub const usage =
     \\Usage: zpotify print [format]...
     \\

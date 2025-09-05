@@ -21,7 +21,6 @@ in
         ../vendor
         ../build.zig
         ../build.zig.zon
-        ../_zpotify
       ];
     };
 
@@ -41,7 +40,7 @@ in
 
     postInstall = ''
       installShellCompletion --cmd zpotify \
-        --zsh _zpotify
+        --zsh <($out/bin/zpotify completion zsh)
     '';
 
     meta = {
