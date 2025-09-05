@@ -90,7 +90,8 @@ fn loop() !void {
         const read = try ui.term.readInput(&buf);
         var it = spoon.inputParser(buf[0..read]);
         while (it.next()) |in| {
-            std.log.debug("Input: {f}", .{in});
+            // this should be logged to a file, `2>>log` does the job for debugging tho
+            //std.log.debug("Input: {f}", .{in});
 
             if (in.eqlDescription("q")) {
                 return;

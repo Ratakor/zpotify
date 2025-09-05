@@ -99,7 +99,6 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 
-- fix notification footer growing when going up (bug introduced in v0.4.0 with zig 0.15 rewrite)
 - fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
 - add `zpotify play liked` cmd which play liked songs
