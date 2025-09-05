@@ -23,16 +23,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1756266583,
-        "narHash": "sha256-cr748nSmpfvnhqSXPiCfUPxRz2FJnvf/RjJGvFfaCsM=",
+        "lastModified": 1756911493,
+        "narHash": "sha256-6n/n1GZQ/vi+LhFXMSyoseKdNfc2QQaSBXJdgamrbkE=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+        "rev": "c6a788f552b7b7af703b1a29802a7233c0067908",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixos-unstable",
+        "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -51,15 +51,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1756458078,
-        "narHash": "sha256-9+LjtjZk0stkVO1wwg+kXYGn+uM4JsxajOILv1aAOq0=",
+        "lastModified": 1757016094,
+        "narHash": "sha256-+4PWAu4ZilE0se0g12scsIvnvfTnIYPqQKbAvRr7Ldw=",
         "owner": "silversquirl",
         "repo": "zig-flake",
-        "rev": "4508e3f3e0cc13e606079718a4f609f86bb33a65",
+        "rev": "a543787714768b1bf68929b641d56b97cf46bfbe",
         "type": "github"
       },
       "original": {
         "owner": "silversquirl",
+        "ref": "compat",
         "repo": "zig-flake",
         "type": "github"
       }
@@ -70,21 +71,21 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "zig-flake": [
+        "zig-overlay": [
           "zig"
         ]
       },
       "locked": {
-        "lastModified": 1756379486,
-        "narHash": "sha256-ngOu6aGF9qAWw2BwU3RTZPxWZRee+9NcsNTfn3vPmYU=",
-        "owner": "Ratakor",
+        "lastModified": 1756048867,
+        "narHash": "sha256-GFzSHUljcxy7sM1PaabbkQUdUnLwpherekPWJFxXtnk=",
+        "owner": "zigtools",
         "repo": "zls",
-        "rev": "fb9ee50c3e4c9deaecd4cd50c3c620df0cb49cc7",
+        "rev": "ce6c8f02c78e622421cfc2405c67c5222819ec03",
         "type": "github"
       },
       "original": {
-        "owner": "Ratakor",
-        "ref": "older-versions",
+        "owner": "zigtools",
+        "ref": "0.15.0",
         "repo": "zls",
         "type": "github"
       }

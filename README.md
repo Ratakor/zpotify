@@ -90,6 +90,7 @@ Benchmark 2 (43 runs): ./run zpotify
 - [chafa](https://github.com/hpjansson/chafa)
 
 ## TODO
+- fix notification footer growing when going up (bug introduced in v0.4.0 with zig 0.15 rewrite)
 - remove usage of std.Io.GenericWriter in spoon
 - make image support optional via a compile option
 - autogen zsh completions

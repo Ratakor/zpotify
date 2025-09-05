@@ -1,20 +1,19 @@
 {
-  description = "A CLI/TUI for Spotify";
+  description = "CLI/TUI for Spotify";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     zig = {
-      url = "github:silversquirl/zig-flake";
+      url = "github:silversquirl/zig-flake/compat";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     zls = {
-      # https://github.com/zigtools/zls/pull/2469
-      url = "github:Ratakor/zls/older-versions";
+      url = "github:zigtools/zls/0.15.0";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        zig-flake.follows = "zig";
+        zig-overlay.follows = "zig";
       };
     };
   };
@@ -28,50 +27,23 @@
   }: let
     forAllSystems = f: builtins.mapAttrs f nixpkgs.legacyPackages;
   in {
-    devShells = forAllSystems (system: pkgs: {
-      default = pkgs.mkShellNoCC {
-        inherit (self.packages.${system}.default) nativeBuildInputs buildInputs;
-
-        packages = with pkgs; [
-          git
-          bash
-          zig.packages.${system}.zig_0_15_1
-          zls.packages.${system}.zls_0_15_0
-
-          # `zig build release` dependencies
-          gnutar
-          xz
-          p7zip
-        ];
-      };
-    });
-
     packages = forAllSystems (system: pkgs: {
-      default = zig.packages.${system}.zig_0_15_1.makePackage {
-        pname = "zpotify";
-        version = "0.4.0-dev";
-
-        src = ./.;
-        zigReleaseMode = "fast";
-        # depsHash = "<replace this with the hash Nix provides in its error message>"
-
-        nativeBuildInputs = with pkgs; [
-          pkg-config
-        ];
-
-        buildInputs = with pkgs; [
-          glib
-          chafa
-          libjpeg
-        ];
-
-        meta = with pkgs.lib; {
-          description = "A CLI/TUI for Spotify";
-          homepage = "https://github.com/ratakor/zpotify";
-          license = licenses.gpl3Plus;
-          mainProgram = "zpotify";
-        };
+      default = self.packages.${system}.zpotify;
+      zpotify = pkgs.callPackage ./nix/package.nix {
+        zigPlatform = zig.packages.${system}.zig_0_15_1;
       };
     });
+
+    devShells = forAllSystems (system: pkgs: {
+      default = pkgs.callPackage ./nix/shell.nix {
+        inherit (self.packages.${system}.default) nativeBuildInputs buildInputs;
+        zig = zig.packages.${system}.zig_0_15_1;
+        zls = zls.packages.${system}.default;
+        # https://github.com/NixOS/nixpkgs/pull/438854
+        # zls = pkgs.zls_0_15;
+      };
+    });
+
+    formatter = forAllSystems (_: pkgs: pkgs.alejandra);
   };
 }
