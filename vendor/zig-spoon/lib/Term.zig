@@ -204,7 +204,7 @@ pub fn cook(self: *Self) !void {
 
 pub fn fetchSize(self: *Self) !void {
     if (self.cooked) return;
-    var size = mem.zeroes(os.winsize);
+    var size = mem.zeroes(posix.winsize);
     const err = os.ioctl(self.tty, os.T.IOCGWINSZ, @intFromPtr(&size));
     if (std.posix.errno(err) != .SUCCESS) {
         return std.posix.unexpectedErrno(@as(os.E, @enumFromInt(err)));

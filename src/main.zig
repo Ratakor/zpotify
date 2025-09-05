@@ -28,9 +28,30 @@ pub const usage = blk: {
     break :blk str;
 };
 
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+
 pub fn main() !void {
-    axe.init(std.heap.c_allocator, null, null) catch unreachable;
-    defer axe.deinit(std.heap.c_allocator);
+    const allocator = if (builtin.mode == .Debug)
+        debug_allocator.allocator()
+    else if (builtin.link_libc)
+        std.heap.c_allocator
+    else
+        std.heap.smp_allocator;
+
+    // allocator used with ArenaAllocator
+    const raw_allocator = if (builtin.mode == .Debug)
+        allocator
+    else if (builtin.link_libc)
+        std.heap.raw_c_allocator
+    else
+        std.heap.page_allocator;
+
+    defer if (builtin.mode == .Debug) {
+        _ = debug_allocator.deinit();
+    };
+
+    axe.init(allocator, null, null) catch unreachable;
+    defer axe.deinit(allocator);
 
     var args = std.process.args();
     std.debug.assert(args.skip());
@@ -44,7 +65,7 @@ pub fn main() !void {
     }
 
     if (std.mem.eql(u8, command, "logout")) {
-        return cmd.logout.exec(std.heap.c_allocator);
+        return cmd.logout.exec(allocator);
     } else if (std.mem.eql(u8, command, "help")) {
         return cmd.help.exec(args.next());
     } else if (std.mem.eql(u8, command, "version")) {
@@ -53,15 +74,15 @@ pub fn main() !void {
         return cmd.completion.exec(args.next());
     }
 
-    var client = try Client.init(std.heap.c_allocator, std.heap.raw_c_allocator);
+    var client = try Client.init(allocator, raw_allocator);
     defer client.deinit();
 
     if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
     } else if (std.mem.eql(u8, command, "search")) {
-        return cmd.search.exec(&client, std.heap.raw_c_allocator, &args);
+        return cmd.search.exec(&client, raw_allocator, &args);
     } else if (std.mem.eql(u8, command, "play")) {
-        return cmd.play.exec(&client, std.heap.raw_c_allocator, args.next());
+        return cmd.play.exec(&client, raw_allocator, args.next());
     } else if (std.mem.eql(u8, command, "pause")) {
         return cmd.pause.exec(&client);
     } else if (std.mem.eql(u8, command, "prev")) {
@@ -85,7 +106,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "transfer")) {
         return cmd.transfer.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "waybar")) {
-        return cmd.waybar.exec(&client, std.heap.raw_c_allocator);
+        return cmd.waybar.exec(&client, raw_allocator);
     } else {
         try cmd.help.exec(command);
         std.process.exit(1);

@@ -1,18 +1,19 @@
 const std = @import("std");
 const spoon = @import("spoon");
+const image_support = @import("build_options").image_support;
 const api = @import("api.zig");
-const c = @cImport({
+const c = if (image_support) @cImport({
     @cInclude("stdio.h");
     @cInclude("jpeglib.h");
     @cInclude("jerror.h");
     @cInclude("setjmp.h");
     @cInclude("chafa.h");
-});
+}) else {};
 
 pub var term: spoon.Term = undefined;
 pub var enable_image = true;
-var term_info: *c.ChafaTermInfo = undefined;
-var chafa_config: *c.ChafaCanvasConfig = undefined;
+var term_info: if (image_support) *c.ChafaTermInfo else void = undefined;
+var chafa_config: if (image_support) *c.ChafaCanvasConfig else void = undefined;
 
 pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
     term = try .init(.{});
@@ -28,19 +29,23 @@ pub fn init(sigWinchHandler: std.posix.Sigaction.handler_fn) !void {
     try term.uncook(.{ .request_mouse_tracking = true });
     try term.fetchSize();
 
-    term_info = c.chafa_term_db_detect(c.chafa_term_db_get_default(), @ptrCast(std.c.environ)).?;
+    if (image_support) {
+        term_info = c.chafa_term_db_detect(c.chafa_term_db_get_default(), @ptrCast(std.c.environ)).?;
 
-    const symbol_map = c.chafa_symbol_map_new().?;
-    defer c.chafa_symbol_map_unref(symbol_map);
-    c.chafa_symbol_map_add_by_tags(symbol_map, c.CHAFA_SYMBOL_TAG_HALF);
-    chafa_config = c.chafa_canvas_config_new().?;
-    c.chafa_canvas_config_set_symbol_map(chafa_config, symbol_map);
-    detectTerminal(chafa_config);
+        const symbol_map = c.chafa_symbol_map_new().?;
+        defer c.chafa_symbol_map_unref(symbol_map);
+        c.chafa_symbol_map_add_by_tags(symbol_map, c.CHAFA_SYMBOL_TAG_HALF);
+        chafa_config = c.chafa_canvas_config_new().?;
+        c.chafa_canvas_config_set_symbol_map(chafa_config, symbol_map);
+        detectTerminal(chafa_config);
+    }
 }
 
 pub fn deinit() void {
-    c.chafa_term_info_unref(term_info);
-    c.chafa_canvas_config_unref(chafa_config);
+    if (image_support) {
+        c.chafa_term_info_unref(term_info);
+        c.chafa_canvas_config_unref(chafa_config);
+    }
     term.deinit();
 }
 
@@ -356,28 +361,28 @@ pub const Table = struct {
                 rc,
                 first_row,
                 selected_row,
-                self.imageUrl(),
+                if (image_support) self.imageUrl() else {},
             ),
             .artists => |list| try drawArtists(
                 list.items[start..end],
                 rc,
                 first_row,
                 selected_row,
-                self.imageUrl(),
+                if (image_support) self.imageUrl() else {},
             ),
             .albums => |list| try drawAlbums(
                 list.items[start..end],
                 rc,
                 first_row,
                 selected_row,
-                self.imageUrl(),
+                if (image_support) self.imageUrl() else {},
             ),
             .playlists => |list| try drawPlaylists(
                 list.items[start..end],
                 rc,
                 first_row,
                 selected_row,
-                self.imageUrl(),
+                if (image_support) self.imageUrl() else {},
             ),
         }
     }
@@ -752,7 +757,7 @@ const drawTracks = makeDrawFn(
             }
         }
     }.writeField,
-    true,
+    image_support,
 );
 
 const drawArtists = makeDrawFn(
@@ -783,7 +788,7 @@ const drawArtists = makeDrawFn(
             }
         }
     }.writeField,
-    true,
+    image_support,
 );
 
 const drawAlbums = makeDrawFn(
@@ -813,7 +818,7 @@ const drawAlbums = makeDrawFn(
             }
         }
     }.writeField,
-    true,
+    image_support,
 );
 
 const drawPlaylists = makeDrawFn(
@@ -838,7 +843,7 @@ const drawPlaylists = makeDrawFn(
             }
         }
     }.writeField,
-    true,
+    image_support,
 );
 
 pub const drawDevices = makeDrawFn(

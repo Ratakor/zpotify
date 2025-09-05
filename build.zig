@@ -13,7 +13,8 @@ const release_targets = [_]std.Target.Query{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },
     .{ .cpu_arch = .aarch64, .os_tag = .linux },
     .{ .cpu_arch = .x86_64, .os_tag = .linux },
-    .{ .cpu_arch = .x86_64, .os_tag = .windows },
+    .{ .cpu_arch = .x86_64, .os_tag = .freebsd },
+    // .{ .cpu_arch = .x86_64, .os_tag = .windows },
 };
 
 pub fn build(b: *std.Build) void {
@@ -24,7 +25,7 @@ pub fn build(b: *std.Build) void {
     const pie = b.option(bool, "pie", "Build a Position Independent Executable");
     const strip = b.option(bool, "strip", "Strip executable");
     const use_llvm = b.option(bool, "use-llvm", "Use Zig's llvm code backend");
-    // const image_support = b.option(bool, "image-support", "Build with image support (requires chafa and libjpeg)");
+    const image_support = b.option(bool, "image-support", "Build with image support (requires chafa and libjpeg)") orelse false;
 
     const resolved_version = getVersion(b);
 
@@ -33,12 +34,12 @@ pub fn build(b: *std.Build) void {
         options.addOption([]const u8, "program_name", program_name);
         options.addOption(std.SemanticVersion, "version", resolved_version);
         options.addOption([]const u8, "version_string", b.fmt("{f}", .{resolved_version}));
-        // options.addOption(bool, "image_support", image_support orelse false);
+        options.addOption(bool, "image_support", image_support);
         break :blk options.createModule();
     };
 
-    // TODO: build without libc/chafa/libjpeg support
     // zig build release
+    // -Dimage-support=false -Dstrip=true --release=fast
     var release_artifacts: [release_targets.len]*std.Build.Step.Compile = undefined;
     for (release_targets, &release_artifacts) |target_query, *artifact| {
         const release_target = b.resolveTargetQuery(target_query);
@@ -55,7 +56,7 @@ pub fn build(b: *std.Build) void {
         const exe_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = release_target,
-            .optimize = .ReleaseFast,
+            .optimize = optimize,
             .single_threaded = single_threaded,
             .pic = pie,
             .strip = strip,
@@ -72,9 +73,11 @@ pub fn build(b: *std.Build) void {
             .use_llvm = use_llvm,
             .use_lld = use_llvm,
         });
-        artifact.*.linkLibC();
-        artifact.*.linkSystemLibrary("chafa");
-        artifact.*.linkSystemLibrary("libjpeg");
+        if (image_support) {
+            artifact.*.linkLibC();
+            artifact.*.linkSystemLibrary("chafa");
+            artifact.*.linkSystemLibrary("libjpeg");
+        }
     }
     release(b, &release_artifacts, resolved_version);
 
@@ -108,9 +111,11 @@ pub fn build(b: *std.Build) void {
         .use_llvm = use_llvm,
         .use_lld = use_llvm,
     });
-    exe.linkLibC();
-    exe.linkSystemLibrary("chafa");
-    exe.linkSystemLibrary("libjpeg");
+    if (image_support) {
+        exe.linkLibC();
+        exe.linkSystemLibrary("chafa");
+        exe.linkSystemLibrary("libjpeg");
+    }
     b.installArtifact(exe);
 
     // zib build run

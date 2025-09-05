@@ -22,7 +22,7 @@ Requires zig 0.15.1, libjpeg and chafa.
 ```
 git clone https://github.com/ratakor/zpotify
 cd zpotify
-zig build -Doptimize=ReleaseSafe
+zig build --release=fast -Dimage-support=true
 ```
 
 Shell completions are auto-generated with `zpotify completion [shell]`!
@@ -101,7 +101,6 @@ Benchmark 2 (43 runs): ./run zpotify
 
 - fix notification footer growing when going up (bug introduced in v0.4.0 with zig 0.15 rewrite)
 - fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
-- make image support optional via a compile option
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
 - add `zpotify play liked` cmd which play liked songs
 - add a way to save track / album to a playlist

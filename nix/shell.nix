@@ -6,12 +6,12 @@
   gnutar,
   xz,
   p7zip,
-  nativeBuildInputs,
-  buildInputs,
+  pkg-config,
+  glib,
+  chafa,
+  libjpeg,
 }:
 mkShellNoCC {
-  inherit nativeBuildInputs buildInputs;
-
   packages = [
     bash # required by zig-flake
     zig
@@ -21,5 +21,15 @@ mkShellNoCC {
     gnutar
     xz
     p7zip
+  ];
+
+  nativeBuildInputs = [
+    pkg-config
+  ];
+
+  buildInputs = [
+    glib
+    chafa
+    libjpeg
   ];
 }

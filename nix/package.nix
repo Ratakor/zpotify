@@ -6,10 +6,11 @@
   glib,
   chafa,
   libjpeg,
+  image-support ? false,
 }: let
   fs = lib.fileset;
 in
-  zigPlatform.makePackage {
+  zigPlatform.makePackage rec {
     pname = "zpotify";
     # Must match the `version` in `build.zig.zon`.
     version = "0.4.0-dev";
@@ -24,15 +25,19 @@ in
       ];
     };
 
-    zigReleaseMode = "safe";
     depsHash = "sha256-jOcxZL2o/fgn5IMRpF4NwyxSEX6n2oSdacnBJVs7BgY=";
+    zigReleaseMode = "fast";
+    zigFlags = [
+      "-Dversion-string=${version}"
+      "-Dimage-support=${lib.boolToString image-support}"
+    ];
 
     nativeBuildInputs = [
       installShellFiles
       pkg-config
     ];
 
-    buildInputs = [
+    buildInputs = lib.optionals image-support [
       glib # chafa dependency
       chafa
       libjpeg

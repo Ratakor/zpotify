@@ -36,7 +36,6 @@
 
     devShells = forAllSystems (system: pkgs: {
       default = pkgs.callPackage ./nix/shell.nix {
-        inherit (self.packages.${system}.default) nativeBuildInputs buildInputs;
         zig = zig.packages.${system}.zig_0_15_1;
         zls = zls.packages.${system}.default;
         # https://github.com/NixOS/nixpkgs/pull/438854
