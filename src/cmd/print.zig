@@ -2,34 +2,35 @@ const std = @import("std");
 const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
+pub const description = "Display current track info in a specific format";
 pub const usage =
     \\Usage: zpotify print [format]...
     \\
     \\Description: Display current track info in a specific format
     \\
     \\Format options:
-    \\  {{title}}: prints the title of the current track
-    \\  {{state}}: prints the current playback state
-    \\  {{state:Playing/Paused}}: prints "Playing" if the track is playing, "Paused" otherwise
-    \\  {{album}}: prints the name of the current album
-    \\  {{artist}}: prints the name of the first artist of the current track
-    \\  {{artists:separator}}: prints all artists separated by the separator (default is ", ")
-    \\  {{device}}: prints the name of the current device
-    \\  {{volume}}: prints the current volume
-    \\  {{repeat}}: prints the current repeat state
-    \\  {{shuffle}}: prints the current shuffle state
-    \\  {{bar:n}}: prints a progress bar of length n (default is 50)
-    \\  {{progress}}: prints the current progress as min:sec
-    \\  {{duration}}: prints the duration of the current track as min:sec
-    \\  {{url}}: prints the URL of the current track
-    \\  {{image}}: prints the URL of the current track's album cover
-    \\  {{icon}}: prints the URL of the current track's album cover with the smallest size
-    \\  \{{: prints '{{'
-    \\  \}}: prints '}}'
+    \\  {title}: prints the title of the current track
+    \\  {state}: prints the current playback state
+    \\  {state:Playing/Paused}: prints "Playing" if the track is playing, "Paused" otherwise
+    \\  {album}: prints the name of the current album
+    \\  {artist}: prints the name of the first artist of the current track
+    \\  {artists:separator}: prints all artists separated by the separator (default is ", ")
+    \\  {device}: prints the name of the current device
+    \\  {volume}: prints the current volume
+    \\  {repeat}: prints the current repeat state
+    \\  {shuffle}: prints the current shuffle state
+    \\  {bar:n}: prints a progress bar of length n (default is 50)
+    \\  {progress}: prints the current progress as min:sec
+    \\  {duration}: prints the duration of the current track as min:sec
+    \\  {url}: prints the URL of the current track
+    \\  {image}: prints the URL of the current track's album cover
+    \\  {icon}: prints the URL of the current track's album cover with the smallest size
+    \\  \{: prints '{'
+    \\  \}: prints '}'
     \\
     \\Default Format:
     \\
-++ escapeDefaultFormat();
+++ default_format;
 
 const default_format =
     \\Track: {title}
@@ -45,17 +46,6 @@ const default_format =
     \\State: {state}
     \\
 ;
-
-fn escapeDefaultFormat() []const u8 {
-    comptime {
-        @setEvalBranchQuota(10000);
-        var buffer: [4096]u8 = undefined;
-        var fba = std.heap.FixedBufferAllocator.init(buffer[0..]);
-        const allocator = fba.allocator();
-        const tmp = std.mem.replaceOwned(u8, allocator, default_format, "{", "{{") catch unreachable;
-        return std.mem.replaceOwned(u8, allocator, tmp, "}", "}}") catch unreachable;
-    }
-}
 
 pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
     const playback_state = try api.getPlaybackState(client);

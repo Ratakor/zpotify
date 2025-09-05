@@ -1,6 +1,7 @@
 const std = @import("std");
 const api = @import("../api.zig");
 
+pub const description = "Display tracks in the queue";
 pub const usage =
     \\Usage: zpotify queue
     \\

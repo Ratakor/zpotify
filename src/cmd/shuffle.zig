@@ -2,6 +2,7 @@ const std = @import("std");
 const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
+pub const description = "Toggle shuffle mode or force it to a specific state";
 pub const usage =
     \\Usage: zpotify shuffle [on|off]
     \\

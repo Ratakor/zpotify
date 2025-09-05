@@ -12,30 +12,21 @@ pub const std_options: std.Options = .{
     .logFn = axe.log,
 };
 
-pub const usage =
-    \\Usage: zpotify [command] [options]
-    \\
-    \\Commands:
-    \\  print      | Display current track info in a specific format
-    \\  search     | Search a track, playlist, album, or artist with a TUI
-    \\  play       | Play a track, playlist, album, or artist from your library
-    \\  pause      | Toggle pause state
-    \\  prev       | Skip to previous track
-    \\  next       | Skip to next track
-    \\  repeat     | Get/Set repeat mode
-    \\  shuffle    | Toggle shuffle mode or force it to a specific state
-    \\  seek       | Get/Set the position of the current track
-    \\  volume     | Get/Set volume or increase/decrease volume by 10%
-    \\  like       | Add the current track to your liked songs
-    \\  queue      | Display tracks in the queue
-    \\  devices    | List all available devices
-    \\  transfer   | Transfer playback to another device
-    \\  waybar     | Display infos about the current playback for a waybar module
-    \\  logout     | Remove the stored credentials from the config file
-    \\  help       | Display information about a command
-    \\  version    | Display program version
-    \\
-;
+pub const usage = blk: {
+    var str: []const u8 =
+        \\Usage: zpotify [command] [options]
+        \\
+        \\Commands:
+        \\
+    ;
+    for (std.meta.declarations(cmd)) |decl| {
+        str = str ++ std.fmt.comptimePrint("  {s: <10} {s}\n", .{
+            decl.name,
+            @field(cmd, decl.name).description,
+        });
+    }
+    break :blk str;
+};
 
 pub fn main() !void {
     axe.init(std.heap.c_allocator, null, null) catch unreachable;

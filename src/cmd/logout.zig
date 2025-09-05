@@ -1,6 +1,7 @@
 const std = @import("std");
 const Client = @import("../Client.zig");
 
+pub const description = "Remove the stored credentials from the config file";
 pub const usage =
     \\Usage: zpotify logout
     \\

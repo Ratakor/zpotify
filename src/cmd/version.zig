@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 
+pub const description = "Display program version";
 pub const usage =
     \\Usage: zpotify version
     \\

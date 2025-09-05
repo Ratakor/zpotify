@@ -3,24 +3,25 @@ const axe = @import("../main.zig").axe;
 const api = @import("../api.zig");
 const writeTime = @import("../cmd.zig").print.writeTime;
 
+pub const description = "Display infos about the current playback for a waybar module";
 pub const usage =
     \\Usage: zpotify waybar
     \\
     \\Description: Display infos about the current playback every second for use in a waybar module
     \\
     \\Return format:
-    \\{{
-    \\    "text": "{{state:/}} {{artist}} - {{title}}",
-    \\    "tooltip": "Track: {{title}}\nArtist(s): {{artists}}\nAlbum: {{album}}\nDevice: {{device}}\nProgress: {{bar:40}} {{progress}} / {{duration}}\nShuffle: {{shuffle}}\t\tVolume: {{volume}}%\t\tRepeat: {{repeat}}"
-    \\}}
+    \\{
+    \\    "text": "{state:/} {artist} - {title}",
+    \\    "tooltip": "Track: {title}\nArtist(s): {artists}\nAlbum: {album}\nDevice: {device}\nProgress: {bar:40} {progress} / {duration}\nShuffle: {shuffle}\t\tVolume: {volume}%\t\tRepeat: {repeat}"
+    \\}
     \\
     \\Configuration:
-    \\"custom/zpotify": {{
+    \\"custom/zpotify": {
     \\    "exec": "zpotify waybar",
     \\    "return-type": "json",
     \\    "tooltip": true,
     \\    "on-click": "zpotify pause >/dev/null"
-    \\}}
+    \\}
     \\
 ;
 

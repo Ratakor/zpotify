@@ -2,6 +2,7 @@ const std = @import("std");
 const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
+pub const description = "Get/Set repeat mode";
 pub const usage =
     \\Usage: zpotify repeat [track|context|off]
     \\

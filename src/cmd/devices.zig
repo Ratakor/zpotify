@@ -1,6 +1,7 @@
 const std = @import("std");
 const api = @import("../api.zig");
 
+pub const description = "List all available devices";
 pub const usage =
     \\Usage: zpotify devices
     \\

@@ -1,6 +1,7 @@
 const std = @import("std");
 const api = @import("../api.zig");
 
+pub const description = "Skip to next track";
 pub const usage =
     \\Usage: zpotify next
     \\

@@ -1,6 +1,7 @@
 const std = @import("std");
 const api = @import("../api.zig");
 
+pub const description = "Add the current track to your liked songs";
 pub const usage =
     \\Usage: zpotify like
     \\

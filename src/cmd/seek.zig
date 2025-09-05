@@ -2,6 +2,7 @@ const std = @import("std");
 const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
+pub const description = "Get/Set the position of the current track";
 pub const usage =
     \\Usage: zpotify seek [time]
     \\

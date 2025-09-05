@@ -2,6 +2,7 @@ const std = @import("std");
 const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
+pub const description = "Transfer playback to another device";
 pub const usage =
     \\Usage: zpotify transfer [device]
     \\

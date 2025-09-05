@@ -2,6 +2,7 @@ const std = @import("std");
 const api = @import("../api.zig");
 const help = @import("../cmd.zig").help;
 
+pub const description = "Get/Set volume or increase/decrease volume by 10%";
 pub const usage =
     \\Usage: zpotify volume [0-100|up|down]
     \\

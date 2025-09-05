@@ -1,6 +1,5 @@
 // when adding a new command make sure to add it to
-// - src/cmd/help.zig
-// - src/main.zig (usage + main())
+// - src/main.zig (main())
 // - src/cmd.zig
 // - _zpotify (main_commands + help)
 // - README.md
