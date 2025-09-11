@@ -101,6 +101,7 @@ Benchmark 2 (43 runs): ./run zpotify
 ## TODO
 
 - fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
+  - or switch to [libvaxis](https://github.com/rockorager/libvaxis) which also allows to change license
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
 - add `zpotify play liked` cmd which play liked songs
 - add a way to save track / album to a playlist
@@ -109,6 +110,7 @@ Benchmark 2 (43 runs): ./run zpotify
   - use [build.crab](https://github.com/akarpovskii/build.crab) for build integration
   - librespot alternative?: [cspot](https://github.com/feelfreelinux/cspot)
 - add man page with [zzdoc](https://github.com/rockorager/zzdoc)
+- convert these TODOs into github issues
 - redo the perf analysis
 - add test coverage
 - add a tui like `search` for `queue` to edit the queue
