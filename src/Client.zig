@@ -10,7 +10,7 @@ expiration: i64,
 http_client: std.http.Client,
 arena: std.heap.ArenaAllocator,
 
-const redirect_uri = "http://localhost:9999/callback";
+const redirect_uri = "http://127.0.0.1:9999/callback";
 const save_filename = "config.json";
 
 const Save = struct {
