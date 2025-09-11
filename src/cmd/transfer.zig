@@ -4,10 +4,10 @@ const help = @import("../cmd.zig").help;
 
 pub const description = "Transfer playback to another device";
 pub const usage =
-    \\Usage: zpotify transfer [device]
+    \\Usage: zpotify transfer <device>
     \\
     \\Description: Transfer playback to another device
-    \\             [device] can be the name or ID of an available device
+    \\             <device> can be the name or ID of an available device
     \\
 ;
 

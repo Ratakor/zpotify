@@ -7,7 +7,7 @@ const Table = ui.Table;
 
 pub const description = "Search a track, playlist, album, or artist with a TUI";
 pub const usage =
-    \\Usage: zpotify search [track|artist|album|playlist] [query]...
+    \\Usage: zpotify search <track|artist|album|playlist> <query>...
     \\
     \\Description: Search a track, playlist, album, or artist with a TUI
     \\

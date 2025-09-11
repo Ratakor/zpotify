@@ -4,7 +4,7 @@ const help = @import("../cmd.zig").help;
 
 pub const description = "Play a track, playlist, album, or artist from your library";
 pub const usage =
-    \\Usage: zpotify play [track|playlist|album|artist]
+    \\Usage: zpotify play <track|playlist|album|artist>
     \\
     \\Description: Play a track, playlist, album, or artist from your library
     \\             If no arguments are provided, playback will be resumed for the current device

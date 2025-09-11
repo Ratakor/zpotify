@@ -14,7 +14,7 @@ pub const std_options: std.Options = .{
 
 pub const usage = blk: {
     var str: []const u8 =
-        \\Usage: zpotify [command] [options]
+        \\Usage: zpotify [--]<command> [options]
         \\
         \\Commands:
         \\

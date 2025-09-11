@@ -33,7 +33,7 @@ Shell completions are auto-generated with `zpotify completion [shell]`!
 Requires Spotify premium.
 
 ```
-Usage: zpotify [command] [options]
+Usage: zpotify [--]<command> [options]
 
 Commands:
   print       Display current track info in a specific format
