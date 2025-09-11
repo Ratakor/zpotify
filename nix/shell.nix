@@ -13,7 +13,6 @@
 }:
 mkShellNoCC {
   packages = [
-    bash # required by zig-flake
     zig
     zls
 

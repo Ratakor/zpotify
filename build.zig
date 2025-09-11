@@ -75,6 +75,7 @@ pub fn build(b: *std.Build) void {
         });
         if (image_support) {
             artifact.*.linkLibC();
+            artifact.*.linkSystemLibrary("glib-2.0");
             artifact.*.linkSystemLibrary("chafa");
             artifact.*.linkSystemLibrary("libjpeg");
         }
@@ -113,6 +114,7 @@ pub fn build(b: *std.Build) void {
     });
     if (image_support) {
         exe.linkLibC();
+        exe.linkSystemLibrary("glib-2.0");
         exe.linkSystemLibrary("chafa");
         exe.linkSystemLibrary("libjpeg");
     }

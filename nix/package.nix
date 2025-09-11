@@ -1,16 +1,18 @@
 {
   lib,
-  zigPlatform,
+  stdenv,
+  callPackage,
   installShellFiles,
   pkg-config,
+  zig,
   glib,
   chafa,
   libjpeg,
-  image-support ? false,
+  image-support ? true,
 }: let
   fs = lib.fileset;
 in
-  zigPlatform.makePackage rec {
+  stdenv.mkDerivation (finalAttrs: {
     pname = "zpotify";
     # Must match the `version` in `build.zig.zon`.
     version = "0.4.0-dev";
@@ -25,16 +27,20 @@ in
       ];
     };
 
-    depsHash = "sha256-jOcxZL2o/fgn5IMRpF4NwyxSEX6n2oSdacnBJVs7BgY=";
-    zigReleaseMode = "fast";
-    zigFlags = [
-      "-Dversion-string=${version}"
+    deps = callPackage ./deps.nix {};
+
+    zigBuildFlags = [
+      "--system"
+      "${finalAttrs.deps}"
+      # "--release=fast"
+      "-Dversion-string=${finalAttrs.version}"
       "-Dimage-support=${lib.boolToString image-support}"
     ];
 
     nativeBuildInputs = [
       installShellFiles
       pkg-config
+      zig.hook
     ];
 
     buildInputs = lib.optionals image-support [
@@ -51,8 +57,8 @@ in
     meta = {
       description = "CLI/TUI for Spotify";
       homepage = "https://github.com/ratakor/zpotify";
-      license = lib.licenses.gpl3Plus;
+      license = lib.licenses.gpl3Only;
       maintainers = [lib.maintainers.ratakor];
       mainProgram = "zpotify";
     };
-  }
+  })
