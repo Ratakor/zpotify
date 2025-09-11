@@ -8,7 +8,7 @@ pub const usage =
     \\
     \\Description: Play a track, playlist, album, or artist from your library
     \\             If no arguments are provided, playback will be resumed for the current device
-    \\             Change the $DMENU environment variable to use a different menu program (default: dmenu -i)
+    \\             Change the $ZPOTIFY_DMENU environment variable to use a different menu program (default: dmenu -i)
     \\
 ;
 
@@ -42,6 +42,8 @@ const Query = enum {
     }
 };
 
+var dmenu_cmd: []const u8 = undefined;
+
 pub fn exec(
     client: *api.Client,
     child_allocator: std.mem.Allocator,
@@ -62,6 +64,8 @@ pub fn exec(
     var arena = std.heap.ArenaAllocator.init(child_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+
+    dmenu_cmd = std.posix.getenv("ZPOTIFY_DMENU") orelse std.posix.getenv("DMENU") orelse "dmenu -i";
 
     switch (query) {
         .track => {
@@ -128,7 +132,6 @@ fn startPlayback(
             break :blk devices[0].id.?;
         }
 
-        const dmenu_cmd = std.posix.getenv("DMENU") orelse "dmenu -i";
         const result = try spawnMenu(allocator, dmenu_cmd, devices);
         defer allocator.free(result);
 
@@ -155,8 +158,6 @@ fn getItemFromMenu(
     allocator: std.mem.Allocator, // arena allocator
 ) !query.Type() {
     const Node = query.NodeType();
-
-    const dmenu_cmd = std.posix.getenv("DMENU") orelse "dmenu -i";
 
     var list: std.DoublyLinkedList = .{};
     list.prepend(blk: {
