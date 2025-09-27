@@ -50,14 +50,14 @@ pub fn init(
             };
         } else |err| {
             std.log.warn("Failed to parse the save file: {}", .{err});
-            break :blk try cwd.createFile(save_path, .{});
+            break :blk try cwd.createFile(save_path, .{ .mode = 0o600 });
         }
     } else |err| blk: {
         if (err != error.FileNotFound) {
             return err;
         }
         try cwd.makePath(save_path[0 .. save_path.len - save_filename.len]);
-        break :blk try cwd.createFile(save_path, .{});
+        break :blk try cwd.createFile(save_path, .{ .mode = 0o600 });
     };
     errdefer cwd.deleteFile(save_path) catch {};
     defer save_file.close();
