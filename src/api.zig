@@ -20,17 +20,13 @@ pub const scopes = [_][]const u8{
 };
 
 pub const Track = struct {
-    album: Album = .{},
+    album: SimplifiedAlbum = .{},
     artists: []const SimplifiedArtist = &[_]SimplifiedArtist{},
     available_markets: []const []const u8 = &[_][]const u8{},
     disc_number: u64 = 0,
     duration_ms: u64 = 0,
     explicit: bool = false,
-    external_ids: struct {
-        isrc: []const u8 = "",
-        ean: []const u8 = "",
-        upc: []const u8 = "",
-    } = .{},
+    external_ids: ExternalIds = .{},
     external_urls: ExternalUrls = .{},
     href: []const u8 = "",
     id: []const u8 = "",
@@ -70,7 +66,36 @@ pub const Artist = struct {
     uri: []const u8 = "",
 };
 
-pub const Album = struct {
+pub const SavedAlbum = struct {
+    album_type: []const u8 = "",
+    total_tracks: u64 = 0,
+    available_markets: []const []const u8 = &[_][]const u8{},
+    external_urls: ExternalUrls = .{},
+    href: []const u8 = "",
+    id: []const u8 = "",
+    images: []const Image = &[_]Image{},
+    name: []const u8 = "",
+    release_date: []const u8 = "",
+    release_date_precision: []const u8 = "",
+    restrictions: struct {
+        reason: []const u8 = "",
+    } = .{},
+    type: []const u8 = "album",
+    uri: []const u8 = "",
+    artists: []const SimplifiedArtist = &[_]SimplifiedArtist{},
+    tracks: Tracks(.default) = .{},
+    copyrights: []const struct {
+        text: []const u8 = "",
+        type: []const u8 = "",
+    } = &.{},
+    external_ids: ExternalIds = .{},
+    genres: []const []const u8 = &.{}, // deprecated: the array is always empty
+    label: []const u8 = "",
+    popularity: u64 = 0, // between 0 and 100, with 100 being the most popular
+};
+
+pub const Album = SimplifiedAlbum;
+pub const SimplifiedAlbum = struct {
     album_type: []const u8 = "",
     total_tracks: u64 = 0,
     available_markets: []const []const u8 = &[_][]const u8{},
@@ -133,6 +158,12 @@ pub const ExternalUrls = struct {
     spotify: []const u8 = "https://open.spotify.com",
 };
 
+pub const ExternalIds = struct {
+    isrc: []const u8 = "",
+    ean: []const u8 = "",
+    upc: []const u8 = "",
+};
+
 pub const Image = struct {
     url: []const u8 = "",
     height: ?u64 = null,
@@ -178,7 +209,7 @@ pub fn Tracks(comptime kind: Kind) type {
                 //     url: ?[]const u8 = null,
                 // } = .{},
             },
-        },
+        } = &.{},
     };
 }
 
@@ -214,9 +245,9 @@ pub fn Albums(comptime kind: Kind) type {
         previous: ?[]const u8 = null,
         total: u64 = 0,
         items: []const switch (kind) {
-            .default => Album,
+            .default => SimplifiedAlbum,
             .saved => struct {
-                album: Album = .{},
+                album: SavedAlbum = .{},
                 added_at: []const u8 = "",
             },
             else => unreachable,

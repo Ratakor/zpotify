@@ -100,10 +100,11 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 
-- fix `play {album,track}` & `search {track,playlist}`
+- fix `play {album,track}` & `search {track,playlist}` & `queue`
 - bash completion
 - fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
   - or switch to [libvaxis](https://github.com/rockorager/libvaxis) which also allows to change license
+- add a tui like `search` for `queue` to edit the queue
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
 - add `zpotify play liked` cmd which play liked songs
 - add a way to save track / album to a playlist
@@ -115,4 +116,3 @@ Benchmark 2 (43 runs): ./run zpotify
 - convert these TODOs into github issues
 - redo the perf analysis
 - add test coverage
-- add a tui like `search` for `queue` to edit the queue

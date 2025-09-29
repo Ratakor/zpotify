@@ -24,7 +24,7 @@ const Query = enum {
         return switch (query) {
             .track => api.Track,
             .playlist => api.Playlist,
-            .album => api.Album,
+            .album => api.SavedAlbum,
             .artist => api.Artist,
         };
     }
