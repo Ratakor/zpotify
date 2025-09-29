@@ -51,6 +51,7 @@ in
 
     postInstall = ''
       installShellCompletion --cmd zpotify \
+        --bash <($out/bin/zpotify completion bash) \
         --zsh <($out/bin/zpotify completion zsh)
     '';
 

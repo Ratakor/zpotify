@@ -26,7 +26,7 @@ cd zpotify
 zig build --release=fast -Dimage-support=true
 ```
 
-Shell completions are auto-generated with `zpotify completion [shell]`!
+Shell completions are auto-generated with `zpotify completion <shell>`!
 
 ## Usage
 
@@ -100,6 +100,8 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 
+- fix `play {album,track}` & `search {track,playlist}`
+- bash completion
 - fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
   - or switch to [libvaxis](https://github.com/rockorager/libvaxis) which also allows to change license
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
