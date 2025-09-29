@@ -3,27 +3,34 @@ const cmd = @import("../cmd.zig");
 
 pub const description = "Generate shell completion script";
 pub const usage =
-    \\Usage: zpotify completion [shell]
+    \\Usage: zpotify completion <shell>
     \\
-    \\Description: Generate shell completion script for the specified shell (default: zsh)
+    \\Description: Generate shell completion script for the specified shell
     \\
-    \\Supported shells: zsh
+    \\Supported shells: bash zsh
     \\
 ;
 
 const Shell = enum {
+    bash,
     zsh,
 
     fn completion(self: Shell) []const u8 {
         return switch (self) {
+            .bash => bash_completion,
             .zsh => zsh_completion,
         };
     }
 };
 
 pub fn exec(optional_shell: ?[]const u8) !void {
-    const shell = std.meta.stringToEnum(Shell, optional_shell orelse "zsh") orelse {
-        std.log.err("Unsupported shell: {s}", .{optional_shell.?});
+    const shell_str = optional_shell orelse {
+        try cmd.help.exec("completion");
+        std.process.exit(1);
+    };
+
+    const shell = std.meta.stringToEnum(Shell, shell_str) orelse {
+        std.log.err("Unsupported shell: {s}", .{shell_str});
         try cmd.help.exec("completion");
         std.process.exit(1);
     };
@@ -32,6 +39,22 @@ pub fn exec(optional_shell: ?[]const u8) !void {
     const stdout = &stdout_writer.interface;
     try stdout.writeAll(shell.completion());
 }
+
+// TODO!
+const bash_completion = blk: {
+    // const decls = std.meta.declarations(cmd);
+    var str: []const u8 =
+        \\_zpotify_module()
+        \\{
+        \\
+    ;
+    str = str ++
+        \\}
+        \\complete -F _zpotify_module zpotify
+        \\
+    ;
+    break :blk str;
+};
 
 const zsh_completion = blk: {
     const decls = std.meta.declarations(cmd);
@@ -78,7 +101,7 @@ const zsh_completion = blk: {
         \\            _arguments -s "2:device:(($devices))"
         \\            ;;
         \\        completion)
-        \\            _arguments -s "2:shell:(zsh)"
+        \\            _arguments -s "2:shell:(bash zsh)"
         \\            ;;
         \\        help)
         \\            _arguments -s "2:commands:(

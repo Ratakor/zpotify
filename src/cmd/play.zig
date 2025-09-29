@@ -65,6 +65,7 @@ pub fn exec(
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    // Checking $DMENU for backward compatibility
     dmenu_cmd = std.posix.getenv("ZPOTIFY_DMENU") orelse std.posix.getenv("DMENU") orelse "dmenu -i";
 
     switch (query) {
