@@ -367,16 +367,6 @@ fn getToken(self: *Client, payload: []const u8) !?[]const u8 {
     var decompress: std.http.Decompress = undefined;
     const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
 
-    // debug raw response
-    if (false) {
-        var stderr = std.fs.File.stderr().writer(&.{});
-        const response_writer = &stderr.interface;
-        _ = reader.streamRemaining(response_writer) catch |err| switch (err) {
-            error.ReadFailed => return response.bodyErr().?,
-            else => |e| return e,
-        };
-    }
-
     var json_reader: std.json.Reader = .init(fba.allocator(), reader);
     defer json_reader.deinit();
 

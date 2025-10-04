@@ -101,12 +101,14 @@ Benchmark 2 (43 runs): ./run zpotify
 ## TODO
 
 - fix `play {album,track}` & `search track` & `queue`
+  - probably an issue in std.compress.flate.Decompress although it may be fixed with zig master
 - bash completion
 - fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
   - or switch to [libvaxis](https://github.com/rockorager/libvaxis) which also allows to change license
 - add a tui like `search` for `queue` to edit the queue
 - add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
 - add `zpotify play liked` cmd which play liked songs
+  - how is it different from `zpotify play track`?
 - add a way to save track / album to a playlist
 - embed [librespot](https://github.com/librespot-org/librespot) or add a wrapper like [librespot-cfg](https://gist.github.com/Ratakor/7dab4b17311a5c60d3b36ad34a02388a)
   - need to create bindings
