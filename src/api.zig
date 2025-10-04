@@ -121,7 +121,7 @@ pub const Playlist = struct {
     external_urls: ExternalUrls = .{},
     href: []const u8 = "",
     id: []const u8 = "",
-    images: []const Image = &[_]Image{},
+    images: ?[]const Image = null,
     name: []const u8 = "",
     owner: struct {
         external_urls: ExternalUrls = .{},
@@ -132,7 +132,7 @@ pub const Playlist = struct {
         uri: []const u8 = "",
         display_name: ?[]const u8 = null,
     } = .{},
-    // primary_color: ?[]const u8 = null,
+    primary_color: ?[]const u8 = null,
     public: ?bool = null, // nullable but not in the docs :D
     snapshot_id: []const u8 = "",
     tracks: struct {

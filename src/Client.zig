@@ -183,8 +183,8 @@ pub fn sendRequestOwned(
 
     // debug raw response
     if (false) {
-        var stderr = std.fs.File.stderr().writer(&.{});
-        const response_writer = &stderr.interface;
+        var stdout = std.fs.File.stdout().writer(&.{});
+        const response_writer = &stdout.interface;
         _ = reader.streamRemaining(response_writer) catch |err| switch (err) {
             error.ReadFailed => return response.bodyErr().?,
             else => |e| return e,
