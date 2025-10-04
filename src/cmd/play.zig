@@ -159,6 +159,7 @@ fn getItemFromMenu(
     allocator: std.mem.Allocator, // arena allocator
 ) !query.Type() {
     const Node = query.NodeType();
+    const nullable = query == .playlist; // we should check for optional type instead
 
     var list: std.DoublyLinkedList = .{};
     list.prepend(blk: {
@@ -212,8 +213,19 @@ fn getItemFromMenu(
                     .album => _item.album,
                     else => _item,
                 };
-                if (std.mem.eql(u8, item.name, result)) {
-                    return item;
+                // This is mainly because playlist can be null with a search
+                // query and since play share the same structure there is this
+                // ugly code here
+                if (nullable) {
+                    if (item) |it| {
+                        if (std.mem.eql(u8, it.name, result)) {
+                            return it;
+                        }
+                    }
+                } else {
+                    if (std.mem.eql(u8, item.name, result)) {
+                        return item;
+                    }
                 }
             }
             std.log.err("Invalid selection: '{s}'", .{result});
@@ -223,7 +235,14 @@ fn getItemFromMenu(
 }
 
 fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]const u8 {
-    const T = @typeInfo(@TypeOf(items)).pointer.child;
+    const T, const nullable = blk: {
+        const T = @typeInfo(@TypeOf(items)).pointer.child;
+        const ti = @typeInfo(T);
+        break :blk switch (ti) {
+            .optional => |opt| .{ opt.child, true },
+            else => .{ T, false },
+        };
+    };
 
     // buffer used for writing to the child process then reading from it
     var common_buffer: [4096]u8 = undefined;
@@ -255,6 +274,10 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
             try writer.print("{s} - {s}\n", .{ item.track.artists[0].name, item.track.name });
         } else if (@hasField(T, "album")) {
             try writer.print("{s} - {s}\n", .{ item.album.artists[0].name, item.album.name });
+        } else if (nullable) {
+            if (item) |it| {
+                try writer.print("{s}\n", .{it.name});
+            }
         } else {
             try writer.print("{s}\n", .{item.name});
         }
