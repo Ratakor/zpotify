@@ -59,7 +59,7 @@ pub const Artist = struct {
     genres: []const []const u8 = &[_][]const u8{},
     href: []const u8 = "",
     id: []const u8 = "",
-    images: []const Image = &[_]Image{},
+    images: ?[]const Image = null,
     name: []const u8 = "",
     popularity: u64 = 0,
     type: []const u8 = "artist",
@@ -73,7 +73,7 @@ pub const SavedAlbum = struct {
     external_urls: ExternalUrls = .{},
     href: []const u8 = "",
     id: []const u8 = "",
-    images: []const Image = &[_]Image{},
+    images: ?[]const Image = null,
     name: []const u8 = "",
     release_date: []const u8 = "",
     release_date_precision: []const u8 = "",
@@ -102,7 +102,7 @@ pub const SimplifiedAlbum = struct {
     external_urls: ExternalUrls = .{},
     href: []const u8 = "",
     id: []const u8 = "",
-    images: []const Image = &[_]Image{},
+    images: ?[]const Image = null,
     name: []const u8 = "",
     release_date: []const u8 = "",
     release_date_precision: []const u8 = "",
@@ -262,7 +262,7 @@ pub const Playlists = struct {
     offset: u64 = 0,
     previous: ?[]const u8 = null,
     total: u64 = 0,
-    items: []const Playlist = &[_]Playlist{},
+    items: []const ?Playlist = &.{},
 };
 
 // care the JSON is coated in a struct, get a look at getDevices()

@@ -100,7 +100,7 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 
-- fix `play {album,track}` & `search {track,playlist}` & `queue`
+- fix `play {album,track}` & `search track` & `queue`
 - bash completion
 - fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
   - or switch to [libvaxis](https://github.com/rockorager/libvaxis) which also allows to change license

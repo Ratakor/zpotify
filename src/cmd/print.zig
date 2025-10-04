@@ -252,18 +252,26 @@ fn handleFormatArg(writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackSt
         }
     } else if (std.mem.eql(u8, arg, "image")) {
         if (info.item) |track| {
-            // assume at least one image and that the first one is the largest
-            try writer.writeAll(track.album.images[0].url);
-        } else {
-            try writer.writeAll("null");
+            if (track.album.images) |images| {
+                if (images.len > 0) {
+                    // assume that the first image is the largest
+                    try writer.writeAll(images[0].url);
+                    return;
+                }
+            }
         }
+        try writer.writeAll("null");
     } else if (std.mem.eql(u8, arg, "icon")) {
         if (info.item) |track| {
-            // assume at least one image and that the last one is the smallest
-            try writer.writeAll(track.album.images[track.album.images.len - 1].url);
-        } else {
-            try writer.writeAll("null");
+            if (track.album.images) |images| {
+                if (images.len > 0) {
+                    // assume that the last image is the smallest
+                    try writer.writeAll(images[images.len - 1].url);
+                    return;
+                }
+            }
         }
+        try writer.writeAll("null");
     } else {
         std.log.err("Unknown format argument: {s}", .{arg});
         try help.exec("print");

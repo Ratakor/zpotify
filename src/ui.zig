@@ -498,16 +498,20 @@ pub const Table = struct {
             .tracks => |list| list.items[self.selected].album.images,
             inline else => |list| list.items[self.selected].images,
         };
-        // const perfect_size = term.width_pixels * 20 / 100;
-        return switch (images.len) {
-            0 => null,
-            1 => images[0].url,
-            else => blk: {
-                // we should pick the best one based on the terminal size but
-                // this is faster (lol) and it's the best one in most cases
-                break :blk images[1].url;
-            },
-        };
+        if (images) |imgs| {
+            // const perfect_size = term.width_pixels * 20 / 100;
+            return switch (imgs.len) {
+                0 => null,
+                1 => imgs[0].url,
+                else => blk: {
+                    // we should pick the best one based on the terminal size but
+                    // this is faster (lol) and it's the best one in most cases
+                    break :blk imgs[1].url;
+                },
+            };
+        } else {
+            return null;
+        }
     }
 
     pub fn len(self: Table) usize {

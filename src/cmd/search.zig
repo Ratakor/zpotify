@@ -380,7 +380,11 @@ fn fetchAlbums(self: *Table) !void {
 
 fn fetchPlaylists(self: *Table) !void {
     const result = try api.search(self.client, self.query, "playlist", Table.limit, self.len());
-    try self.list.playlists.appendSlice(self.allocator, result.playlists.?.items);
+    for (result.playlists.?.items) |playlist| {
+        if (playlist) |pl| {
+            try self.list.playlists.append(self.allocator, pl);
+        }
+    }
     self.total = result.playlists.?.total;
     self.has_next = result.playlists.?.next != null;
 }
