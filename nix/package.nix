@@ -3,12 +3,7 @@
   stdenv,
   callPackage,
   installShellFiles,
-  pkg-config,
   zig,
-  glib,
-  chafa,
-  libjpeg,
-  image-support ? true,
 }:
 let
   fs = lib.fileset;
@@ -35,19 +30,11 @@ stdenv.mkDerivation (finalAttrs: {
     "${finalAttrs.deps}"
     # "--release=fast"
     "-Dversion-string=${finalAttrs.version}"
-    "-Dimage-support=${lib.boolToString image-support}"
   ];
 
   nativeBuildInputs = [
     installShellFiles
-    pkg-config
     zig.hook
-  ];
-
-  buildInputs = lib.optionals image-support [
-    glib # chafa dependency
-    chafa
-    libjpeg
   ];
 
   postInstall = ''

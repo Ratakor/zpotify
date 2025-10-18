@@ -6,10 +6,6 @@
   gnutar,
   xz,
   p7zip,
-  pkg-config,
-  glib,
-  chafa,
-  libjpeg,
 }:
 mkShellNoCC {
   packages = [
@@ -21,15 +17,5 @@ mkShellNoCC {
     gnutar
     xz
     p7zip
-  ];
-
-  nativeBuildInputs = [
-    pkg-config
-  ];
-
-  buildInputs = [
-    glib
-    chafa
-    libjpeg
   ];
 }
