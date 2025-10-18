@@ -112,11 +112,7 @@ pub fn build(b: *std.Build) void {
 
     // zig build fmt
     const fmt_step = b.step("fmt", "Format all source files");
-    fmt_step.dependOn(&b.addFmt(.{ .paths = &.{
-        "build.zig",
-        "src",
-        "vendor/zig-spoon",
-    } }).step);
+    fmt_step.dependOn(&b.addFmt(.{ .paths = &.{ "build.zig", "src" } }).step);
 }
 
 /// Returns `MAJOR.MINOR.PATCH-dev` when `git describe` failed.
