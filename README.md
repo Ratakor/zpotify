@@ -98,7 +98,6 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 
-- fix `play album`
 - rework `play` play command
   - maybe add a command (`list`) to display all user items and a command to
     play a certain ID so the user can glue it however he wants instead of being

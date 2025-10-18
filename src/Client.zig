@@ -176,7 +176,10 @@ pub fn sendRequestOwned(
     );
 
     // usually compressed with gzip
-    var decompress_buffer: [8 * std.compress.flate.max_window_len]u8 = undefined;
+    // so this needs to be at least:
+    // - 8 * std.compress.flate.max_window_len for `play track`
+    // - 32 * std.compress.flate.max_window_len for `play album`
+    var decompress_buffer: [32 * std.compress.flate.max_window_len]u8 = undefined;
     var transfer_buffer: [64]u8 = undefined;
     var decompress: std.http.Decompress = undefined;
     const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
