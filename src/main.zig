@@ -79,8 +79,6 @@ pub fn main() !void {
 
     if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
-    } else if (std.mem.eql(u8, command, "search")) {
-        return cmd.search.exec(&client, raw_allocator, &args);
     } else if (std.mem.eql(u8, command, "play")) {
         return cmd.play.exec(&client, raw_allocator, args.next());
     } else if (std.mem.eql(u8, command, "pause")) {

@@ -84,7 +84,7 @@ const zsh_completion = blk: {
         \\            format_options=($format_options)
         \\            _arguments -s "*:format:(($format_options))"
         \\            ;;
-        \\        play|search)
+        \\        play)
         \\            _arguments -s "2:query_type:(track playlist album artist)"
         \\            ;;
         \\        repeat)

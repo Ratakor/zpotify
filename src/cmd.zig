@@ -5,7 +5,6 @@
 // - README.md (Usage)
 
 pub const print = @import("cmd/print.zig");
-pub const search = @import("cmd/search.zig");
 pub const play = @import("cmd/play.zig");
 pub const pause = @import("cmd/pause.zig");
 pub const prev = @import("cmd/prev.zig");
