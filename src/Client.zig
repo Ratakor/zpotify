@@ -176,7 +176,7 @@ pub fn sendRequestOwned(
     );
 
     // usually compressed with gzip
-    var decompress_buffer: [std.compress.flate.max_window_len]u8 = undefined;
+    var decompress_buffer: [32 * std.compress.flate.max_window_len]u8 = undefined;
     var transfer_buffer: [64]u8 = undefined;
     var decompress: std.http.Decompress = undefined;
     const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
