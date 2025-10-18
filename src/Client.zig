@@ -176,19 +176,24 @@ pub fn sendRequestOwned(
     );
 
     // usually compressed with gzip
-    var decompress_buffer: [std.compress.flate.max_window_len]u8 = undefined;
+    var decompress_buffer: [8 * std.compress.flate.max_window_len]u8 = undefined;
     var transfer_buffer: [64]u8 = undefined;
     var decompress: std.http.Decompress = undefined;
     const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
+    // const reader = response.reader(&transfer_buffer);
 
     // debug raw response
     if (false) {
-        var stdout = std.fs.File.stdout().writer(&.{});
-        const response_writer = &stdout.interface;
-        _ = reader.streamRemaining(response_writer) catch |err| switch (err) {
+        var stdout_writer = std.fs.File.stdout().writer(&.{});
+        const stdout = &stdout_writer.interface;
+        const written = reader.streamRemaining(stdout) catch |err| switch (err) {
             error.ReadFailed => return response.bodyErr().?,
             else => |e| return e,
         };
+        std.log.debug("written: {}", .{written});
+        if (written > 0) {
+            std.process.exit(0);
+        }
     }
 
     var json_reader: std.json.Reader = .init(fba.allocator(), reader);

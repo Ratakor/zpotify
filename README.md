@@ -98,18 +98,15 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 
-- fix `play {album,track}` & `queue`
-  - probably an issue in std.compress.flate.Decompress although it may be fixed with zig master
+- fix `play album`
 - rework `play` play command
-  - maybe add a command to display all user items and a command to play a
-    certain ID so the user can glue it however he wants instead of being forced
-    to use a dmenu-like program
-- add `zpotify play liked` cmd which play liked songs
-  - how is it different from `zpotify play track`?
+  - maybe add a command (`list`) to display all user items and a command to
+    play a certain ID so the user can glue it however he wants instead of being
+    forced to use a dmenu-like program
+  - also merge `queue` command with that new command(?)
 - bash completion
 - add a way to save track / album to a playlist
   - `save` command which takes a tack ID and a playlist ID (or names or whatever)
 - add man page with [zzdoc](https://github.com/rockorager/zzdoc)
 - redo the perf analysis
 - add test coverage
-- convert these TODOs into github issues
