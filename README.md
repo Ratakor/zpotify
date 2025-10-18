@@ -5,7 +5,7 @@ https://github.com/user-attachments/assets/5a97453a-db8a-4689-b2d0-ab1f2009fcb0
 
 ## Installation
 
-### [AUR](https://aur.archlinux.org/packages/zpotify) [deprecated]
+### [AUR](https://aur.archlinux.org/packages/zpotify)
 
 Using your favorite AUR helper or manually:
 
@@ -17,13 +17,12 @@ makepkg -si
 
 ### Building
 
-Requires zig 0.15.1.
-Requires glib-2.0, libjpeg and chafa for image support.
+Requires `zig 0.15.2`.
 
 ```
 git clone https://github.com/ratakor/zpotify
 cd zpotify
-zig build --release=fast -Dimage-support=true
+zig build --release=fast
 ```
 
 Shell completions are auto-generated with `zpotify completion <shell>`!
@@ -37,7 +36,6 @@ Usage: zpotify [--]<command> [options]
 
 Commands:
   print       Display current track info in a specific format
-  search      Search a track, playlist, album, or artist with a TUI
   play        Play a track, playlist, album, or artist from your library
   pause       Toggle pause state
   prev        Skip to previous track
@@ -100,21 +98,18 @@ Benchmark 2 (43 runs): ./run zpotify
 
 ## TODO
 
-- fix `play {album,track}` & `search track` & `queue`
+- fix `play {album,track}` & `queue`
   - probably an issue in std.compress.flate.Decompress although it may be fixed with zig master
-- bash completion
-- fix `FIXME`s in zig-spoon (it's about std.Io.GenericWriter)
-  - or switch to [libvaxis](https://github.com/rockorager/libvaxis) which also allows to change license
-- add a tui like `search` for `queue` to edit the queue
-- add `zpotify status` which is basically `cmd.print.format(stdout, default_format)`
+- rework `play` play command
+  - maybe add a command to display all user items and a command to play a
+    certain ID so the user can glue it however he wants instead of being forced
+    to use a dmenu-like program
 - add `zpotify play liked` cmd which play liked songs
   - how is it different from `zpotify play track`?
+- bash completion
 - add a way to save track / album to a playlist
-- embed [librespot](https://github.com/librespot-org/librespot) or add a wrapper like [librespot-cfg](https://gist.github.com/Ratakor/7dab4b17311a5c60d3b36ad34a02388a)
-  - need to create bindings
-  - use [build.crab](https://github.com/akarpovskii/build.crab) for build integration
-  - librespot alternative?: [cspot](https://github.com/feelfreelinux/cspot)
+  - `save` command which takes a tack ID and a playlist ID (or names or whatever)
 - add man page with [zzdoc](https://github.com/rockorager/zzdoc)
-- convert these TODOs into github issues
 - redo the perf analysis
 - add test coverage
+- convert these TODOs into github issues
