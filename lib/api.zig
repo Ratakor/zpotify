@@ -414,13 +414,6 @@ pub const RepeatState = enum {
     off,
 };
 
-/// https://developer.spotify.com/documentation/web-api/reference/toggle-shuffle-for-users-playback
-pub fn toggleShuffle(client: *Client, state: bool) !void {
-    var buf: [64]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/shuffle?state={}", .{state});
-    return client.sendRequest(void, .PUT, url, "");
-}
-
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
 pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !Tracks(.saved) {
     var buf: [128]u8 = undefined;

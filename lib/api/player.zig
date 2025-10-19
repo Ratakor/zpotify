@@ -114,6 +114,14 @@ pub fn setVolume(client: *Client, volume: u64) !void {
     return client.sendRequest(void, .PUT, url, "");
 }
 
+/// https://developer.spotify.com/documentation/web-api/reference/toggle-shuffle-for-users-playback
+/// scopes: user-modify-playback-state
+pub fn toggleShuffle(client: *Client, state: bool) !void {
+    var buf: [64]u8 = undefined;
+    const url = try std.fmt.bufPrint(&buf, api.api_url ++ "/me/player/shuffle?state={}", .{state});
+    return client.sendRequest(void, .PUT, url, "");
+}
+
 /// https://developer.spotify.com/documentation/web-api/reference/get-recently-played
 /// scopes: user-read-recently-played
 pub fn getRecentlyPlayed(

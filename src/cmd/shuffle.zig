@@ -32,5 +32,5 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     } else {
         std.log.info("Disabling shuffle", .{});
     }
-    try api.toggleShuffle(client, state);
+    try api.player.toggleShuffle(client, state);
 }
