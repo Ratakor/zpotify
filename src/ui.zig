@@ -428,7 +428,7 @@ pub const Table = struct {
                 };
 
                 while (true) {
-                    const tracks = try api.getAlbumTracks(
+                    const tracks = try api.albums.getAlbumTracks(
                         next_table.client,
                         album.id,
                         limit_max,
@@ -479,7 +479,7 @@ pub const Table = struct {
         switch (self.list) {
             .tracks => |list| try api.saveTracks(self.client, list.items[self.selected].id),
             .artists => |list| try api.followArtists(self.client, list.items[self.selected].id),
-            .albums => |list| try api.saveAlbums(self.client, list.items[self.selected].id),
+            .albums => |list| try api.albums.saveAlbums(self.client, list.items[self.selected].id),
             .playlists => |list| try api.followPlaylist(self.client, list.items[self.selected].id),
         }
     }
@@ -488,7 +488,7 @@ pub const Table = struct {
         switch (self.list) {
             .tracks => |list| try api.removeTracks(self.client, list.items[self.selected].id),
             .artists => |list| try api.unfollowArtists(self.client, list.items[self.selected].id),
-            .albums => |list| try api.removeAlbums(self.client, list.items[self.selected].id),
+            .albums => |list| try api.albums.removeAlbums(self.client, list.items[self.selected].id),
             .playlists => |list| try api.unfollowPlaylist(self.client, list.items[self.selected].id),
         }
     }

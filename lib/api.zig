@@ -1,10 +1,13 @@
 //! https://developer.spotify.com/documentation/web-api/reference
+//! Episodes are unhandled.
+//! Specifying market is unhandled, it's often better to rely on user market anyway.
 
 // TODO: remove dependency on Client or make it less tied to the CLI
 
 const std = @import("std");
 pub const Client = @import("Client.zig");
 
+pub const albums = @import("api/albums.zig");
 pub const player = @import("api/player.zig");
 
 /// https://developer.spotify.com/documentation/web-api/concepts/api-calls#base-url
@@ -157,9 +160,11 @@ pub const SavedAlbum = struct {
         type: []const u8 = "",
     } = &.{},
     external_ids: ExternalIds = .{},
-    genres: []const []const u8 = &.{}, // deprecated: the array is always empty
+    /// deprecated: the array is always empty
+    genres: []const []const u8 = &.{},
     label: []const u8 = "",
-    popularity: u64 = 0, // between 0 and 100, with 100 being the most popular
+    /// between 0 and 100, with 100 being the most popular
+    popularity: u64 = 0,
 };
 
 pub const Album = SimplifiedAlbum;
@@ -434,17 +439,6 @@ pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !Tracks(.saved) {
     return client.sendRequest(Tracks(.saved), .GET, url, null);
 }
 
-/// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-albums
-pub fn getUserAlbums(client: *Client, limit: u64, offset: u64) !Albums(.saved) {
-    var buf: [128]u8 = undefined;
-    const url = try std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/me/albums?limit={d}&offset={d}",
-        .{ limit, offset },
-    );
-    return client.sendRequest(Albums(.saved), .GET, url, null);
-}
-
 /// https://developer.spotify.com/documentation/web-api/reference/get-followed
 pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !Artists {
     var buf: [128]u8 = undefined;
@@ -467,20 +461,6 @@ pub fn saveTracks(client: *Client, ids: []const u8) !void {
 pub fn removeTracks(client: *Client, ids: []const u8) !void {
     var buf: [4096]u8 = undefined;
     const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/tracks?ids={s}", .{ids});
-    return client.sendRequest(void, .DELETE, url, null);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/save-albums-user
-pub fn saveAlbums(client: *Client, ids: []const u8) !void {
-    var buf: [4096]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/albums?ids={s}", .{ids});
-    return client.sendRequest(void, .PUT, url, "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/remove-albums-user
-pub fn removeAlbums(client: *Client, ids: []const u8) !void {
-    var buf: [4096]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/albums?ids={s}", .{ids});
     return client.sendRequest(void, .DELETE, url, null);
 }
 
@@ -517,22 +497,6 @@ pub fn getArtist(client: *Client, id: []const u8) !Artist {
     var buf: [256]u8 = undefined;
     const url = try std.fmt.bufPrint(&buf, api_url ++ "/artists/{s}", .{id});
     return client.sendRequest(Artist, .GET, url, null);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/get-an-albums-tracks
-pub fn getAlbumTracks(
-    client: *Client,
-    id: []const u8,
-    limit: usize,
-    offset: usize,
-) !Tracks(.default) {
-    var buf: [256]u8 = undefined;
-    const url = try std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/albums/{s}/tracks?limit={d}&offset={d}",
-        .{ id, limit, offset },
-    );
-    return client.sendRequest(Tracks(.default), .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks

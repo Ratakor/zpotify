@@ -4,7 +4,6 @@ const Client = api.Client;
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
 /// scopes: user-read-playback-state
-// TODO: handle market
 pub fn getPlaybackState(client: *Client) !api.PlaybackState {
     return client.sendRequest(api.PlaybackState, .GET, api.api_url ++ "/me/player", null);
 }
@@ -36,7 +35,6 @@ pub fn getDevices(client: *Client) !api.Devices {
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-the-users-currently-playing-track
 /// scopes: user-read-currently-playing
-// TODO: handle market
 pub fn getCurrentlyPlaying(client: *Client) !api.PlaybackState {
     return client.sendRequest(api.PlaybackState, .GET, api.api_url ++ "/me/player/currently-playing", null);
 }
@@ -128,7 +126,7 @@ pub fn getRecentlyPlayed(
     _ = limit;
     _ = after;
     _ = before;
-    @compileError("TODO: implement");
+    @compileError("unimplemented");
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-queue

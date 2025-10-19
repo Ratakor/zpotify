@@ -167,7 +167,7 @@ fn getItemFromMenu(
         node.* = .{ .data = try switch (query) {
             .track => api.getUserTracks(client, limit, 0),
             .playlist => api.getUserPlaylists(client, limit, 0),
-            .album => api.getUserAlbums(client, limit, 0),
+            .album => api.albums.getUserAlbums(client, limit, 0),
             .artist => api.getUserArtists(client, limit, null),
         } };
         break :blk &node.node;
@@ -197,7 +197,7 @@ fn getItemFromMenu(
                         node.* = .{ .data = try switch (query) {
                             .track => api.getUserTracks(client, limit, offset),
                             .playlist => api.getUserPlaylists(client, limit, offset),
-                            .album => api.getUserAlbums(client, limit, offset),
+                            .album => api.albums.getUserAlbums(client, limit, offset),
                             .artist => unreachable,
                         } };
                         list.insertAfter(current, &node.node);
