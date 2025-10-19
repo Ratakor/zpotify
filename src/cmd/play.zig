@@ -165,7 +165,7 @@ fn getItemFromMenu(
     list.prepend(blk: {
         const node = try allocator.create(Node);
         node.* = .{ .data = try switch (query) {
-            .track => api.getUserTracks(client, limit, 0),
+            .track => api.tracks.getUserTracks(client, limit, 0),
             .playlist => api.playlists.getCurrentUserPlaylists(client, limit, 0),
             .album => api.albums.getUserAlbums(client, limit, 0),
             .artist => api.getUserArtists(client, limit, null),
@@ -195,7 +195,7 @@ fn getItemFromMenu(
                         const offset = current_data.offset + limit;
                         const node = try allocator.create(Node);
                         node.* = .{ .data = try switch (query) {
-                            .track => api.getUserTracks(client, limit, offset),
+                            .track => api.tracks.getUserTracks(client, limit, offset),
                             .playlist => api.playlists.getCurrentUserPlaylists(client, limit, offset),
                             .album => api.albums.getUserAlbums(client, limit, offset),
                             .artist => unreachable,

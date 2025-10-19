@@ -18,7 +18,7 @@ pub fn exec(client: *api.Client) !void {
             track.album.name,
             track.artists[0].name,
         });
-        try api.saveTracks(client, track.id);
+        try api.tracks.saveTracks(client, track.id);
     } else {
         std.log.warn("No track is currently playing", .{});
         std.process.exit(1);

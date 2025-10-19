@@ -477,7 +477,7 @@ pub const Table = struct {
 
     pub fn save(self: Table) !void {
         switch (self.list) {
-            .tracks => |list| try api.saveTracks(self.client, list.items[self.selected].id),
+            .tracks => |list| try api.tracks.saveTracks(self.client, list.items[self.selected].id),
             .artists => |list| try api.followArtists(self.client, list.items[self.selected].id),
             .albums => |list| try api.albums.saveAlbums(self.client, list.items[self.selected].id),
             .playlists => |list| try api.followPlaylist(self.client, list.items[self.selected].id),
@@ -486,7 +486,7 @@ pub const Table = struct {
 
     pub fn remove(self: Table) !void {
         switch (self.list) {
-            .tracks => |list| try api.removeTracks(self.client, list.items[self.selected].id),
+            .tracks => |list| try api.tracks.removeTracks(self.client, list.items[self.selected].id),
             .artists => |list| try api.unfollowArtists(self.client, list.items[self.selected].id),
             .albums => |list| try api.albums.removeAlbums(self.client, list.items[self.selected].id),
             .playlists => |list| try api.unfollowPlaylist(self.client, list.items[self.selected].id),

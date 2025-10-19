@@ -18,7 +18,7 @@ pub const player = @import("api/player.zig");
 pub const playlists = @import("api/playlists.zig");
 pub const search = @import("api/search.zig").search;
 // Shows are unsupported
-// pub const tracks = @import("api/tracks.zig");
+pub const tracks = @import("api/tracks.zig");
 // pub const users = @import("api/users.zig");
 
 /// https://developer.spotify.com/documentation/web-api/concepts/api-calls#base-url
@@ -414,17 +414,6 @@ pub const RepeatState = enum {
     off,
 };
 
-/// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
-pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !Tracks(.saved) {
-    var buf: [128]u8 = undefined;
-    const url = try std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/me/tracks?limit={d}&offset={d}",
-        .{ limit, offset },
-    );
-    return client.sendRequest(Tracks(.saved), .GET, url, null);
-}
-
 /// https://developer.spotify.com/documentation/web-api/reference/get-followed
 pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !Artists {
     var buf: [128]u8 = undefined;
@@ -434,20 +423,6 @@ pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !Artists 
         .{ limit, a },
     ) else std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&limit={d}", .{limit});
     return (try client.sendRequest(struct { artists: Artists = .{} }, .GET, url, null)).artists;
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/save-tracks-user
-pub fn saveTracks(client: *Client, ids: []const u8) !void {
-    var buf: [4096]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/tracks?ids={s}", .{ids});
-    return client.sendRequest(void, .PUT, url, "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user
-pub fn removeTracks(client: *Client, ids: []const u8) !void {
-    var buf: [4096]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/tracks?ids={s}", .{ids});
-    return client.sendRequest(void, .DELETE, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/follow-artists-users
