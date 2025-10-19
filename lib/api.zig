@@ -16,7 +16,7 @@ pub const artists = @import("api/artists.zig");
 pub const markets = @import("api/markets.zig");
 pub const player = @import("api/player.zig");
 // pub const playlists = @import("api/playlists.zig");
-// pub const search = @import("api/search.zig");
+pub const search = @import("api/search.zig").search;
 // Shows are unsupported
 // pub const tracks = @import("api/tracks.zig");
 // pub const users = @import("api/users.zig");
@@ -383,6 +383,16 @@ pub const PlaybackState = struct {
     // smart_shuffle: ?bool = null,
 };
 
+pub const SearchType = enum {
+    album,
+    artist,
+    playlist,
+    track,
+    // show,
+    // episode,
+    // audiobook,
+};
+
 pub const Search = struct {
     tracks: ?Tracks(.default) = null,
     artists: ?Artists = null,
@@ -403,24 +413,6 @@ pub const RepeatState = enum {
     /// Don't repeat.
     off,
 };
-
-/// https://developer.spotify.com/documentation/web-api/reference/search
-pub fn search(
-    client: *Client,
-    query: []const u8, // will be sanitized
-    types: []const u8, // comma separated list of types
-    limit: u64, // max num of results, 0-50 (default 20)
-    offset: u64, // index of first result to return (default 0)
-) !Search {
-    var buf: [4096]u8 = undefined;
-    const uri_component: std.Uri.Component = .{ .raw = query };
-    const url = try std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/search?q={f}&type={s}&limit={d}&offset={d}",
-        .{ std.fmt.alt(uri_component, .formatQuery), types, limit, offset },
-    );
-    return client.sendRequest(Search, .GET, url, null);
-}
 
 /// https://developer.spotify.com/documentation/web-api/reference/toggle-shuffle-for-users-playback
 pub fn toggleShuffle(client: *Client, state: bool) !void {
