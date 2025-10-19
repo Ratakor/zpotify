@@ -27,14 +27,14 @@ pub fn getArtistAlbums(
     // market: []const u8,
     limit: usize,
     offset: usize,
-) !api.Albums(.default) {
+) !api.SimplifiedAlbums {
     var buf: [256]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
         api.api_url ++ "/artists/{s}/albums?limit={d}&offset={d}",
         .{ id, limit, offset },
     );
-    return client.sendRequest(api.Albums(.default), .GET, url, null);
+    return client.sendRequest(api.SimplifiedAlbums, .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-an-artists-top-tracks

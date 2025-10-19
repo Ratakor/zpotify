@@ -4,7 +4,7 @@ const Client = api.Client;
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-an-album
 /// scopes: none
-pub fn getAlbum(client: *Client, id: []const u8, market: ?[]const u8) !api.SavedAlbum {
+pub fn getAlbum(client: *Client, id: []const u8, market: ?[]const u8) !api.Album {
     _ = client;
     _ = id;
     _ = market;
@@ -13,7 +13,7 @@ pub fn getAlbum(client: *Client, id: []const u8, market: ?[]const u8) !api.Saved
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-multiple-albums
 /// scopes: none
-pub fn getAlbums(client: *Client, ids: []const []const u8, market: ?[]const u8) ![]api.SavedAlbum {
+pub fn getAlbums(client: *Client, ids: []const []const u8, market: ?[]const u8) ![]api.Album {
     _ = client;
     _ = ids;
     _ = market;
@@ -39,14 +39,14 @@ pub fn getAlbumTracks(
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-albums
 /// scopes: user-library-read
-pub fn getUserAlbums(client: *Client, limit: usize, offset: usize) !api.Albums(.saved) {
+pub fn getUserAlbums(client: *Client, limit: usize, offset: usize) !api.Albums {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(
         &buf,
         api.api_url ++ "/me/albums?limit={d}&offset={d}",
         .{ limit, offset },
     );
-    return client.sendRequest(api.Albums(.saved), .GET, url, null);
+    return client.sendRequest(api.Albums, .GET, url, null);
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/save-albums-user
@@ -76,7 +76,7 @@ pub fn checkSavedAlbums(client: *Client, ids: []const u8) ![]bool {
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/get-new-releases
-pub fn getNewReleases(client: *Client, limit: usize, offset: usize) !api.Albums(.default) {
+pub fn getNewReleases(client: *Client, limit: usize, offset: usize) !api.SimplifiedAlbums {
     _ = client;
     _ = limit;
     _ = offset;

@@ -237,7 +237,7 @@ pub const Table = struct {
     list: union(enum) {
         tracks: std.ArrayList(api.Track),
         artists: std.ArrayList(api.Artist),
-        albums: std.ArrayList(api.Album),
+        albums: std.ArrayList(api.SimplifiedAlbum),
         playlists: std.ArrayList(api.Playlist),
     },
     client: *api.Client,
@@ -258,7 +258,7 @@ pub const Table = struct {
     pub const Item = union(Kind) {
         track: *const api.Track,
         artist: *const api.Artist,
-        album: *const api.Album,
+        album: *const api.SimplifiedAlbum,
         playlist: *const api.Playlist,
     };
     pub const limit = 20;
@@ -796,7 +796,7 @@ const drawArtists = makeDrawFn(
 );
 
 const drawAlbums = makeDrawFn(
-    api.Album,
+    api.SimplifiedAlbum,
     "Albums",
     &[_]Column{
         .{ .header_name = "Name", .field = .name, .size = 40 },
@@ -806,7 +806,7 @@ const drawAlbums = makeDrawFn(
     struct {
         fn writeField(
             comptime field: @Type(.enum_literal),
-            item: api.Album,
+            item: api.SimplifiedAlbum,
             writer: anytype,
         ) anyerror!void {
             switch (field) {

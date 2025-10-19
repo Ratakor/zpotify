@@ -138,7 +138,27 @@ pub const Artist = struct {
     uri: []const u8 = "",
 };
 
-pub const SavedAlbum = struct {
+pub const SimplifiedAlbum = struct {
+    album_type: []const u8 = "",
+    total_tracks: u64 = 0,
+    available_markets: []const []const u8 = &[_][]const u8{},
+    external_urls: ExternalUrls = .{},
+    href: []const u8 = "",
+    id: []const u8 = "",
+    images: ?[]const Image = null,
+    name: []const u8 = "",
+    release_date: []const u8 = "",
+    release_date_precision: []const u8 = "",
+    restrictions: struct {
+        reason: []const u8 = "",
+    } = .{},
+    type: []const u8 = "album",
+    uri: []const u8 = "",
+    artists: []const SimplifiedArtist = &[_]SimplifiedArtist{},
+    album_group: []const u8 = "",
+};
+
+pub const Album = struct {
     album_type: []const u8 = "",
     total_tracks: u64 = 0,
     available_markets: []const []const u8 = &[_][]const u8{},
@@ -166,27 +186,6 @@ pub const SavedAlbum = struct {
     label: []const u8 = "",
     /// between 0 and 100, with 100 being the most popular
     popularity: u64 = 0,
-};
-
-pub const Album = SimplifiedAlbum;
-pub const SimplifiedAlbum = struct {
-    album_type: []const u8 = "",
-    total_tracks: u64 = 0,
-    available_markets: []const []const u8 = &[_][]const u8{},
-    external_urls: ExternalUrls = .{},
-    href: []const u8 = "",
-    id: []const u8 = "",
-    images: ?[]const Image = null,
-    name: []const u8 = "",
-    release_date: []const u8 = "",
-    release_date_precision: []const u8 = "",
-    restrictions: struct {
-        reason: []const u8 = "",
-    } = .{},
-    type: []const u8 = "album",
-    uri: []const u8 = "",
-    artists: []const SimplifiedArtist = &[_]SimplifiedArtist{},
-    album_group: []const u8 = "",
 };
 
 pub const Playlist = struct {
@@ -249,7 +248,7 @@ pub const Followers = struct {
     total: u64 = 0,
 };
 
-// used for Tracks() and Albums()
+// used for Tracks()
 const Kind = enum { default, saved, playlist };
 
 pub fn Tracks(comptime kind: Kind) type {
@@ -294,7 +293,7 @@ pub const SimplifiedArtists = struct {
     offset: u64 = 0,
     previous: ?[]const u8 = null,
     total: u64 = 0,
-    items: []const SimplifiedArtist = &[_]SimplifiedArtist{},
+    items: []const SimplifiedArtist = &.{},
 };
 
 pub const Artists = struct {
@@ -306,27 +305,31 @@ pub const Artists = struct {
         before: ?[]const u8 = null,
     } = .{},
     total: u64 = 0,
-    items: []const Artist = &[_]Artist{},
+    items: []const Artist = &.{},
 };
 
-pub fn Albums(comptime kind: Kind) type {
-    return struct {
-        href: []const u8 = "",
-        limit: u64 = 0,
-        next: ?[]const u8 = null,
-        offset: u64 = 0,
-        previous: ?[]const u8 = null,
-        total: u64 = 0,
-        items: []const switch (kind) {
-            .default => SimplifiedAlbum,
-            .saved => struct {
-                album: SavedAlbum = .{},
-                added_at: []const u8 = "",
-            },
-            else => unreachable,
-        },
-    };
-}
+pub const SimplifiedAlbums = struct {
+    href: []const u8 = "",
+    limit: u64 = 0,
+    next: ?[]const u8 = null,
+    offset: u64 = 0,
+    previous: ?[]const u8 = null,
+    total: u64 = 0,
+    items: []const SimplifiedAlbum = &.{},
+};
+
+pub const Albums = struct {
+    href: []const u8 = "",
+    limit: u64 = 0,
+    next: ?[]const u8 = null,
+    offset: u64 = 0,
+    previous: ?[]const u8 = null,
+    total: u64 = 0,
+    items: []const struct {
+        album: Album = .{},
+        added_at: []const u8 = "",
+    } = &.{},
+};
 
 pub const Playlists = struct {
     href: []const u8 = "",
@@ -373,7 +376,7 @@ pub const PlaybackState = struct {
 pub const Search = struct {
     tracks: ?Tracks(.default) = null,
     artists: ?Artists = null,
-    albums: ?Albums(.default) = null,
+    albums: ?SimplifiedAlbums = null,
     playlists: ?Playlists = null,
 };
 

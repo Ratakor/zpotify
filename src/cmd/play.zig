@@ -24,7 +24,7 @@ const Query = enum {
         return switch (query) {
             .track => api.Track,
             .playlist => api.Playlist,
-            .album => api.SavedAlbum,
+            .album => api.Album,
             .artist => api.Artist,
         };
     }
@@ -34,7 +34,7 @@ const Query = enum {
             data: switch (query) {
                 .track => api.Tracks(.saved),
                 .playlist => api.Playlists,
-                .album => api.Albums(.saved),
+                .album => api.Albums,
                 .artist => api.Artists,
             },
             node: std.DoublyLinkedList.Node = .{},
