@@ -127,24 +127,6 @@ pub fn createPlaylist(client: *Client, user_id: []const u8, body: []const u8) !v
     @compileError("unimplemented");
 }
 
-/// Deprecated
-/// https://developer.spotify.com/documentation/web-api/reference/get-featured-playlists
-/// scopes: none
-pub fn getFeaturedPlaylists(client: *Client) !void {
-    _ = client;
-    // there is more args but this is deprecated anyway
-    @compileError("unimplemented");
-}
-
-/// Deprecated
-/// https://developer.spotify.com/documentation/web-api/reference/get-a-categories-playlists
-/// scopes: none
-pub fn getCategoryPlaylists(client: *Client) !void {
-    _ = client;
-    // there is more args but this is deprecated anyway
-    @compileError("unimplemented");
-}
-
 /// https://developer.spotify.com/documentation/web-api/reference/get-playlist-cover
 /// scopes: none
 pub fn getPlaylistCover(client: *Client, playlist_id: []const u8) ![]api.Image {
