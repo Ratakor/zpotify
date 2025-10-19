@@ -8,6 +8,7 @@ const std = @import("std");
 pub const Client = @import("Client.zig");
 
 pub const albums = @import("api/albums.zig");
+pub const artists = @import("api/artists.zig");
 pub const player = @import("api/player.zig");
 
 /// https://developer.spotify.com/documentation/web-api/concepts/api-calls#base-url
@@ -296,7 +297,6 @@ pub const SimplifiedArtists = struct {
     items: []const SimplifiedArtist = &[_]SimplifiedArtist{},
 };
 
-// care the JSON is coated in another struct, get a look at getUserArtists()
 pub const Artists = struct {
     href: []const u8 = "",
     limit: u64 = 0,
@@ -338,7 +338,6 @@ pub const Playlists = struct {
     items: []const ?Playlist = &.{},
 };
 
-// care the JSON is coated in a struct, get a look at player.getDevices()
 pub const Devices = []const Device;
 
 pub const PlaybackState = struct {
@@ -492,13 +491,6 @@ pub fn unfollowPlaylist(client: *Client, id: []const u8) !void {
     return client.sendRequest(void, .DELETE, url, null);
 }
 
-/// https://developer.spotify.com/documentation/web-api/reference/get-an-artist
-pub fn getArtist(client: *Client, id: []const u8) !Artist {
-    var buf: [256]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/artists/{s}", .{id});
-    return client.sendRequest(Artist, .GET, url, null);
-}
-
 /// https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
 pub fn getPlaylistTracks(
     client: *Client,
@@ -513,21 +505,4 @@ pub fn getPlaylistTracks(
         .{ id, limit, offset },
     );
     return client.sendRequest(Tracks(.playlist), .GET, url, null);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums
-pub fn getArtistAlbums(
-    client: *Client,
-    id: []const u8,
-    // include_groups: []const u8, // album, single, appears_on, compilation
-    limit: usize,
-    offset: usize,
-) !Albums(.default) {
-    var buf: [256]u8 = undefined;
-    const url = try std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/artists/{s}/albums?limit={d}&offset={d}",
-        .{ id, limit, offset },
-    );
-    return client.sendRequest(Albums(.default), .GET, url, null);
 }

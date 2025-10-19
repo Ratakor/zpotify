@@ -311,7 +311,7 @@ pub const Table = struct {
     }
 
     fn fetchAlbumsArtist(self: *Table) !void {
-        const albums = try api.getArtistAlbums(self.client, self.query, limit, self.len());
+        const albums = try api.artists.getArtistAlbums(self.client, self.query, limit, self.len());
         try self.list.albums.appendSlice(self.allocator, albums.items);
         self.total = albums.total;
         self.has_next = albums.next != null;
