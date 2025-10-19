@@ -318,7 +318,7 @@ pub const Table = struct {
     }
 
     fn fetchTracksPlaylist(self: *Table) !void {
-        const tracks = try api.getPlaylistTracks(self.client, self.query, limit, self.len());
+        const tracks = try api.playlists.getPlaylistTracks(self.client, self.query, limit, self.len());
         for (tracks.items) |item| {
             try self.list.tracks.append(self.allocator, item.track);
         }

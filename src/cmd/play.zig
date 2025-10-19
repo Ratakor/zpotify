@@ -166,7 +166,7 @@ fn getItemFromMenu(
         const node = try allocator.create(Node);
         node.* = .{ .data = try switch (query) {
             .track => api.getUserTracks(client, limit, 0),
-            .playlist => api.getUserPlaylists(client, limit, 0),
+            .playlist => api.playlists.getCurrentUserPlaylists(client, limit, 0),
             .album => api.albums.getUserAlbums(client, limit, 0),
             .artist => api.getUserArtists(client, limit, null),
         } };
@@ -196,7 +196,7 @@ fn getItemFromMenu(
                         const node = try allocator.create(Node);
                         node.* = .{ .data = try switch (query) {
                             .track => api.getUserTracks(client, limit, offset),
-                            .playlist => api.getUserPlaylists(client, limit, offset),
+                            .playlist => api.playlists.getCurrentUserPlaylists(client, limit, offset),
                             .album => api.albums.getUserAlbums(client, limit, offset),
                             .artist => unreachable,
                         } };

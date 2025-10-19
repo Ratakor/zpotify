@@ -15,7 +15,7 @@ pub const artists = @import("api/artists.zig");
 // Genres are unsupported (because it's deprecated)
 pub const markets = @import("api/markets.zig");
 pub const player = @import("api/player.zig");
-// pub const playlists = @import("api/playlists.zig");
+pub const playlists = @import("api/playlists.zig");
 pub const search = @import("api/search.zig").search;
 // Shows are unsupported
 // pub const tracks = @import("api/tracks.zig");
@@ -421,17 +421,6 @@ pub fn toggleShuffle(client: *Client, state: bool) !void {
     return client.sendRequest(void, .PUT, url, "");
 }
 
-/// https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
-pub fn getUserPlaylists(client: *Client, limit: u64, offset: u64) !Playlists {
-    var buf: [128]u8 = undefined;
-    const url = try std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/me/playlists?limit={d}&offset={d}",
-        .{ limit, offset },
-    );
-    return client.sendRequest(Playlists, .GET, url, null);
-}
-
 /// https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
 pub fn getUserTracks(client: *Client, limit: u64, offset: u64) !Tracks(.saved) {
     var buf: [128]u8 = undefined;
@@ -494,20 +483,4 @@ pub fn unfollowPlaylist(client: *Client, id: []const u8) !void {
     var buf: [128]u8 = undefined;
     const url = try std.fmt.bufPrint(&buf, api_url ++ "/playlists/{s}/followers", .{id});
     return client.sendRequest(void, .DELETE, url, null);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
-pub fn getPlaylistTracks(
-    client: *Client,
-    id: []const u8,
-    limit: usize,
-    offset: usize,
-) !Tracks(.playlist) {
-    var buf: [256]u8 = undefined;
-    const url = try std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/playlists/{s}/tracks?limit={d}&offset={d}",
-        .{ id, limit, offset },
-    );
-    return client.sendRequest(Tracks(.playlist), .GET, url, null);
 }
