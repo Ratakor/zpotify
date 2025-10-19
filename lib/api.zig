@@ -1,15 +1,25 @@
 //! https://developer.spotify.com/documentation/web-api/reference
-//! Episodes are unhandled.
-//! Specifying market is unhandled, it's often better to rely on user market anyway.
-
-// TODO: remove dependency on Client or make it less tied to the CLI
+// Specifying market is unhandled, it's often better to rely on user market anyway.
 
 const std = @import("std");
+
+// TODO: remove dependency on Client or make it less tied to the CLI
 pub const Client = @import("Client.zig");
 
 pub const albums = @import("api/albums.zig");
 pub const artists = @import("api/artists.zig");
+// Audiobooks are unsupported
+// Categories are unsupported (as I don't understand their purpose)
+// Chapters are unsupported
+// Episodes are unsupported
+// Genres are unsupported (because it's deprecated)
+pub const markets = @import("api/markets.zig");
 pub const player = @import("api/player.zig");
+// pub const playlists = @import("api/playlists.zig");
+// pub const search = @import("api/search.zig");
+// Shows are unsupported
+// pub const tracks = @import("api/tracks.zig");
+// pub const users = @import("api/users.zig");
 
 /// https://developer.spotify.com/documentation/web-api/concepts/api-calls#base-url
 pub const base_url = "https://api.spotify.com";
