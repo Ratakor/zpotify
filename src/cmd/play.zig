@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("zpotify").api;
+const api = @import("zpotify");
 const help = @import("../cmd.zig").help;
 
 pub const description = "Play a track, playlist, album, or artist from your library";

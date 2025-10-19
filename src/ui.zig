@@ -1,7 +1,7 @@
 const std = @import("std");
 const spoon = @import("spoon");
 const image_support = @import("build_options").image_support;
-const api = @import("zpotify").api;
+const api = @import("zpotify");
 const c = if (image_support) @cImport({
     @cInclude("stdio.h");
     @cInclude("jpeglib.h");

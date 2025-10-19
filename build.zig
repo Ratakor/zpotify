@@ -45,7 +45,7 @@ pub fn build(b: *std.Build) void {
         const release_target = b.resolveTargetQuery(target_query);
 
         const lib_module = b.createModule(.{
-            .root_source_file = b.path("lib/root.zig"),
+            .root_source_file = b.path("lib/api.zig"),
             .target = release_target,
             .optimize = optimize,
         });
@@ -90,7 +90,7 @@ pub fn build(b: *std.Build) void {
     release(b, &release_artifacts, resolved_version);
 
     const lib_module = b.addModule("zpotify", .{
-        .root_source_file = b.path("lib/root.zig"),
+        .root_source_file = b.path("lib/api.zig"),
         .target = target,
         .optimize = optimize,
         .single_threaded = single_threaded,

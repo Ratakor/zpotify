@@ -1,6 +1,6 @@
 const std = @import("std");
 const spoon = @import("spoon");
-const api = @import("zpotify").api;
+const api = @import("zpotify");
 const ui = @import("../ui.zig");
 const help = @import("../cmd.zig").help;
 const Table = ui.Table;

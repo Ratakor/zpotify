@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("zpotify").api;
+const api = @import("zpotify");
 
 pub const description = "Toggle pause state";
 pub const usage =

@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("zpotify").api;
+const api = @import("zpotify");
 
 pub const description = "Display tracks in the queue";
 pub const usage =
