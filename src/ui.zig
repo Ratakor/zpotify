@@ -478,18 +478,18 @@ pub const Table = struct {
     pub fn save(self: Table) !void {
         switch (self.list) {
             .tracks => |list| try api.tracks.saveTracks(self.client, list.items[self.selected].id),
-            .artists => |list| try api.followArtists(self.client, list.items[self.selected].id),
+            .artists => |list| try api.users.followArtists(self.client, list.items[self.selected].id),
             .albums => |list| try api.albums.saveAlbums(self.client, list.items[self.selected].id),
-            .playlists => |list| try api.followPlaylist(self.client, list.items[self.selected].id),
+            .playlists => |list| try api.users.followPlaylist(self.client, list.items[self.selected].id),
         }
     }
 
     pub fn remove(self: Table) !void {
         switch (self.list) {
             .tracks => |list| try api.tracks.removeTracks(self.client, list.items[self.selected].id),
-            .artists => |list| try api.unfollowArtists(self.client, list.items[self.selected].id),
+            .artists => |list| try api.users.unfollowArtists(self.client, list.items[self.selected].id),
             .albums => |list| try api.albums.removeAlbums(self.client, list.items[self.selected].id),
-            .playlists => |list| try api.unfollowPlaylist(self.client, list.items[self.selected].id),
+            .playlists => |list| try api.users.unfollowPlaylist(self.client, list.items[self.selected].id),
         }
     }
 

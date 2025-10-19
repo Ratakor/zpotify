@@ -118,7 +118,7 @@ pub fn getUserPlaylists(
 
 /// https://developer.spotify.com/documentation/web-api/reference/create-playlist
 /// scopes: playlist-modify-public playlist-modify-private
-// is user_id always `users.currentUserProfile().id`?
+// is user_id always `users.getCurrentUserProfile().id`?
 // body: JSON struct with name, public, collaborative, description
 pub fn createPlaylist(client: *Client, user_id: []const u8, body: []const u8) !void {
     _ = client;

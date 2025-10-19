@@ -19,7 +19,7 @@ pub const playlists = @import("api/playlists.zig");
 pub const search = @import("api/search.zig").search;
 // Shows are unsupported
 pub const tracks = @import("api/tracks.zig");
-// pub const users = @import("api/users.zig");
+pub const users = @import("api/users.zig");
 
 /// https://developer.spotify.com/documentation/web-api/concepts/api-calls#base-url
 pub const base_url = "https://api.spotify.com";
@@ -414,41 +414,23 @@ pub const RepeatState = enum {
     off,
 };
 
-/// https://developer.spotify.com/documentation/web-api/reference/get-followed
-pub fn getUserArtists(client: *Client, limit: u64, after: ?[]const u8) !Artists {
-    var buf: [128]u8 = undefined;
-    const url = try if (after) |a| std.fmt.bufPrint(
-        &buf,
-        api_url ++ "/me/following?type=artist&limit={d}&after={s}",
-        .{ limit, a },
-    ) else std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&limit={d}", .{limit});
-    return (try client.sendRequest(struct { artists: Artists = .{} }, .GET, url, null)).artists;
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/follow-artists-users
-pub fn followArtists(client: *Client, ids: []const u8) !void {
-    var buf: [4096]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&ids={s}", .{ids});
-    return client.sendRequest(void, .PUT, url, "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/unfollow-artists-users
-pub fn unfollowArtists(client: *Client, ids: []const u8) !void {
-    var buf: [4096]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/following?type=artist&ids={s}", .{ids});
-    return client.sendRequest(void, .DELETE, url, null);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/follow-playlist
-pub fn followPlaylist(client: *Client, id: []const u8) !void {
-    var buf: [128]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/playlists/{s}/followers", .{id});
-    return client.sendRequest(void, .PUT, url, "{\"public\":false}");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/unfollow-playlist
-pub fn unfollowPlaylist(client: *Client, id: []const u8) !void {
-    var buf: [128]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/playlists/{s}/followers", .{id});
-    return client.sendRequest(void, .DELETE, url, null);
-}
+pub const User = struct {
+    country: []const u8 = "",
+    display_name: []const u8 = "",
+    email: []const u8 = "",
+    explicit_content: struct {
+        filter_enabled: bool = false,
+        filter_locked: bool = false,
+    } = .{},
+    external_urls: ExternalUrls,
+    followers: struct {
+        href: ?[]const u8 = null,
+        total: usize = 0,
+    } = .{},
+    href: []const u8 = "",
+    id: []const u8 = "",
+    images: ?[]const Image = null,
+    product: ?[]const u8 = null,
+    type: []const u8 = "user",
+    uri: []const u8 = "",
+};

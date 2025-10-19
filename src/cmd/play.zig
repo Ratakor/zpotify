@@ -168,7 +168,7 @@ fn getItemFromMenu(
             .track => api.tracks.getUserTracks(client, limit, 0),
             .playlist => api.playlists.getCurrentUserPlaylists(client, limit, 0),
             .album => api.albums.getUserAlbums(client, limit, 0),
-            .artist => api.getUserArtists(client, limit, null),
+            .artist => api.users.getFollowedArtists(client, limit, null),
         } };
         break :blk &node.node;
     });
@@ -186,7 +186,7 @@ fn getItemFromMenu(
                 if (query == .artist) {
                     if (current_data.cursors.after) |after| {
                         const node = try allocator.create(Node);
-                        node.* = .{ .data = try api.getUserArtists(client, limit, after) };
+                        node.* = .{ .data = try api.users.getFollowedArtists(client, limit, after) };
                         list.insertAfter(current, &node.node);
                         break :blk &node.node;
                     }
