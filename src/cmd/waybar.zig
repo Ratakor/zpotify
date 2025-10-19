@@ -1,6 +1,6 @@
 const std = @import("std");
 const axe = @import("../main.zig").axe;
-const api = @import("../api.zig");
+const api = @import("zpotify").api;
 const writeTime = @import("../cmd.zig").print.writeTime;
 
 pub const description = "Display infos about the current playback for a waybar module";

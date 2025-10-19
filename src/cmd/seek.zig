@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify").api;
 const help = @import("../cmd.zig").help;
 
 pub const description = "Get/Set the position of the current track";

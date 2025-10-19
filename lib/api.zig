@@ -1,5 +1,7 @@
 //! https://developer.spotify.com/documentation/web-api/reference
 
+// TODO: remove dependency on Client or make it less tied to the CLI
+
 const std = @import("std");
 pub const Client = @import("Client.zig");
 

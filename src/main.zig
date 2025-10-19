@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Client = @import("Client.zig");
+const Client = @import("zpotify").Client;
 const cmd = @import("cmd.zig");
 
 pub const axe = @import("axe").Axe(.{

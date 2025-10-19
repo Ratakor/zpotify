@@ -1,5 +1,5 @@
 const std = @import("std");
-const Client = @import("../Client.zig");
+const Client = @import("zpotify").Client;
 
 pub const description = "Remove the stored credentials from the config file";
 pub const usage =

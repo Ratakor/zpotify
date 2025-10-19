@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify").api;
 
 pub const description = "List all available devices";
 pub const usage =
