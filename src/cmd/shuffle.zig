@@ -23,7 +23,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
                 std.process.exit(1);
             }
         } else {
-            const playback_state = try api.getPlaybackState(client);
+            const playback_state = try api.player.getPlaybackState(client);
             break :blk !playback_state.shuffle_state;
         }
     };

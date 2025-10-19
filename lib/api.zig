@@ -5,20 +5,86 @@
 const std = @import("std");
 pub const Client = @import("Client.zig");
 
-const api_url = "https://api.spotify.com/v1";
+pub const player = @import("api/player.zig");
+
+/// https://developer.spotify.com/documentation/web-api/concepts/api-calls#base-url
+pub const base_url = "https://api.spotify.com";
+pub const version = "v1";
+pub const api_url = base_url ++ "/" ++ version;
 
 /// https://developer.spotify.com/documentation/web-api/concepts/scopes
-pub const scopes = [_][]const u8{
-    "user-read-currently-playing",
-    "user-read-playback-state",
-    "user-modify-playback-state",
-    "user-library-modify",
-    "user-library-read",
-    "user-follow-read",
-    "user-follow-modify",
-    "playlist-read-private",
-    "playlist-modify-public",
-    "playlist-modify-private",
+pub const Scope = enum {
+    // Images
+    /// Write access to user-provided images.
+    ugc_image_upload,
+    // Spotify Connect
+    /// Read access to a user's player state.
+    user_read_playback_state,
+    /// Write access to a user's playback state.
+    user_modify_playback_state,
+    /// Read access to a user's currently playing content.
+    user_read_currently_playing,
+    // Playback
+    /// Remote control playback of Spotify.
+    /// This scope is currently available to Spotify iOS and Android SDKs.
+    app_remote_control,
+    /// Control playback of a Spotify track.
+    /// This scope is currently available to the Web Playback SDK.
+    /// The user must have a Spotify Premium Account.
+    streaming,
+    // Playlists
+    /// Read access to user's private playlists.
+    playlist_read_private,
+    /// Include collaborative playlists when requesting a user's playlists.
+    playlist_read_collaborative,
+    /// Write access to a user's private playlists.
+    playlist_modify_private,
+    /// Write access to a user's private playlists.
+    playlist_modify_public,
+    // Follow
+    /// Write/delete access to the list of artists and other users that the user follows.
+    user_follow_modify,
+    /// Read access to the list of artists and other users that the user follows.
+    user_follow_read,
+    // Listening History
+    /// Read access to a user’s playback position in a content.
+    user_read_playback_position,
+    /// Read access to a user's top artists and tracks.
+    user_top_read,
+    /// Read access to a user’s recently played tracks.
+    user_read_recently_played,
+    // Library
+    /// Write/delete access to a user's "Your Music" library.
+    user_library_modify,
+    /// Read access to a user's library.
+    user_library_read,
+    // Users
+    /// Read access to user’s email address.
+    user_read_email,
+    /// Read access to user’s subscription details (type of user account).
+    user_read_private,
+    /// Get personalized content for the user.
+    user_personalized,
+    // Open Access
+    /// Link a partner user account to a Spotify user account
+    user_soa_link,
+    /// Unlink a partner user account from a Spotify account
+    user_soa_unlink,
+    /// Modify entitlements for linked users
+    soa_manage_entitlements,
+    /// Update partner information
+    soa_manage_partner,
+    /// Create new partners, platform partners only
+    soa_create_partner,
+
+    pub fn toString(self: Scope) *const [@tagName(self).len]u8 {
+        comptime {
+            const tag_name = @tagName(self);
+            var output: [tag_name.len]u8 = undefined;
+            _ = std.mem.replace(u8, tag_name, "_", "-", &output);
+            return &output;
+        }
+    }
 };
 
 pub const Track = struct {
@@ -267,7 +333,7 @@ pub const Playlists = struct {
     items: []const ?Playlist = &.{},
 };
 
-// care the JSON is coated in a struct, get a look at getDevices()
+// care the JSON is coated in a struct, get a look at player.getDevices()
 pub const Devices = []const Device;
 
 pub const PlaybackState = struct {
@@ -285,7 +351,18 @@ pub const PlaybackState = struct {
     is_playing: bool = false,
     item: ?Track = null,
     currently_playing_type: []const u8 = "",
-    // actions...
+    actions: ?struct {
+        interrupting_playback: ?bool = null,
+        pausing: ?bool = null,
+        resuming: ?bool = null,
+        seeking: ?bool = null,
+        skipping_next: ?bool = null,
+        skipping_prev: ?bool = null,
+        toggling_repeat_context: ?bool = null,
+        toggling_shuffle: ?bool = null,
+        toggling_repeat_track: ?bool = null,
+        transferring_playback: ?bool = null,
+    } = null,
     // smart_shuffle: ?bool = null,
 };
 
@@ -301,24 +378,14 @@ pub const Queue = struct {
     queue: []const Track = &[_]Track{},
 };
 
-/// https://developer.spotify.com/documentation/web-api/reference/get-information-about-the-users-current-playback
-pub fn getPlaybackState(client: *Client) !PlaybackState {
-    return client.sendRequest(PlaybackState, .GET, api_url ++ "/me/player", null);
-}
-
-pub fn getPlaybackStateOwned(client: *Client, arena: std.mem.Allocator) !PlaybackState {
-    return client.sendRequestOwned(PlaybackState, .GET, api_url ++ "/me/player", null, arena);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/get-a-users-available-devices
-pub fn getDevices(client: *Client) !Devices {
-    return (try client.sendRequest(
-        struct { devices: Devices = &[_]Device{} },
-        .GET,
-        api_url ++ "/me/player/devices",
-        null,
-    )).devices;
-}
+pub const RepeatState = enum {
+    /// Repeat the current track.
+    track,
+    /// Repeat the current context.
+    context,
+    /// Don't repeat.
+    off,
+};
 
 /// https://developer.spotify.com/documentation/web-api/reference/search
 pub fn search(
@@ -336,86 +403,6 @@ pub fn search(
         .{ std.fmt.alt(uri_component, .formatQuery), types, limit, offset },
     );
     return client.sendRequest(Search, .GET, url, null);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback
-pub fn startPlayback(
-    client: *Client,
-    data: ?union(enum) {
-        context_uri: []const u8, // for album, artist or playlist
-        uris: []const []const u8, // for tracks
-    },
-    device_id: ?[]const u8,
-) !void {
-    var buf: [4096]u8 = undefined;
-    var writer = std.Io.Writer.fixed(buf[0..]);
-    const body = blk: {
-        if (data) |uri| {
-            try writer.print("{f}", .{std.json.fmt(uri, .{})});
-            break :blk writer.buffered();
-        } else {
-            break :blk "{}";
-        }
-    };
-
-    if (device_id) |id| {
-        writer = std.Io.Writer.fixed(buf[body.len..]);
-        try writer.print(api_url ++ "/me/player/play?device_id={s}", .{id});
-        const url = writer.buffered();
-        return client.sendRequest(void, .PUT, url, body);
-    } else {
-        return client.sendRequest(void, .PUT, api_url ++ "/me/player/play", body);
-    }
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/pause-a-users-playback
-pub fn pausePlayback(client: *Client) !void {
-    return client.sendRequest(void, .PUT, api_url ++ "/me/player/pause", "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/transfer-a-users-playback
-pub fn transferPlayback(client: *Client, device_id: []const u8) !void {
-    var buf: [128]u8 = undefined;
-    const body = try std.fmt.bufPrint(&buf, "{{\"device_ids\":[\"{s}\"]}}", .{device_id});
-    return client.sendRequest(void, .PUT, api_url ++ "/me/player", body);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/add-to-queue
-pub fn addToQueue(client: *Client, uri: []const u8) !void {
-    var buf: [128]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/queue?uri={s}", .{uri});
-    return client.sendRequest(void, .POST, url, "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/skip-users-playback-to-next-track
-pub fn skipToNext(client: *Client) !void {
-    return client.sendRequest(void, .POST, api_url ++ "/me/player/next", "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/skip-users-playback-to-previous-track
-pub fn skipToPrevious(client: *Client) !void {
-    return client.sendRequest(void, .POST, api_url ++ "/me/player/previous", "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/seek-to-position-in-currently-playing-track
-pub fn seekToPosition(client: *Client, position_ms: u64) !void {
-    var buf: [128]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/seek?position_ms={d}", .{position_ms});
-    return client.sendRequest(void, .PUT, url, "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/set-repeat-mode-on-users-playback
-pub fn setRepeatMode(client: *Client, state: []const u8) !void {
-    var buf: [64]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/repeat?state={s}", .{state});
-    return client.sendRequest(void, .PUT, url, "");
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/set-volume-for-users-playback
-pub fn setVolume(client: *Client, volume: u64) !void {
-    var buf: [64]u8 = undefined;
-    const url = try std.fmt.bufPrint(&buf, api_url ++ "/me/player/volume?volume_percent={d}", .{volume});
-    return client.sendRequest(void, .PUT, url, "");
 }
 
 /// https://developer.spotify.com/documentation/web-api/reference/toggle-shuffle-for-users-playback
@@ -579,9 +566,4 @@ pub fn getArtistAlbums(
         .{ id, limit, offset },
     );
     return client.sendRequest(Albums(.default), .GET, url, null);
-}
-
-/// https://developer.spotify.com/documentation/web-api/reference/get-queue
-pub fn getQueue(client: *Client) !Queue {
-    return try client.sendRequest(Queue, .GET, api_url ++ "/me/player/queue", null);
 }

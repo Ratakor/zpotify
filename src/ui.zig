@@ -466,11 +466,11 @@ pub const Table = struct {
         switch (self.list) {
             .tracks => |list| {
                 const uris = [_][]const u8{list.items[self.selected].uri};
-                try api.startPlayback(self.client, .{ .uris = &uris }, device_id);
+                try api.player.startPlayback(self.client, .{ .uris = &uris }, device_id);
             },
             inline else => |list| {
                 const uri = list.items[self.selected].uri;
-                try api.startPlayback(self.client, .{ .context_uri = uri }, device_id);
+                try api.player.startPlayback(self.client, .{ .context_uri = uri }, device_id);
             },
         }
     }

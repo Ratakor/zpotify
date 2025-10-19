@@ -57,7 +57,7 @@ pub fn exec(
         };
     } else {
         std.log.info("Resuming playback", .{});
-        try api.startPlayback(client, null, null);
+        try api.player.startPlayback(client, null, null);
         return;
     };
 
@@ -109,20 +109,20 @@ fn startPlayback(
     uri: []const u8,
 ) !void {
     if (query == .track) out: {
-        api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, null) catch |err| switch (err) {
+        api.player.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, null) catch |err| switch (err) {
             error.NoActiveDevice => break :out,
             else => return err,
         };
         return;
     } else out: {
-        api.startPlayback(client, .{ .context_uri = uri }, null) catch |err| switch (err) {
+        api.player.startPlayback(client, .{ .context_uri = uri }, null) catch |err| switch (err) {
             error.NoActiveDevice => break :out,
             else => return err,
         };
         return;
     }
 
-    const devices = try api.getDevices(client);
+    const devices = try api.player.getDevices(client);
     if (devices.len == 0) {
         std.log.err("No device found", .{});
         std.process.exit(1);
@@ -146,9 +146,9 @@ fn startPlayback(
     };
 
     if (query == .track) {
-        try api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id);
+        try api.player.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id);
     } else {
-        try api.startPlayback(client, .{ .context_uri = uri }, id);
+        try api.player.startPlayback(client, .{ .context_uri = uri }, id);
     }
 }
 

@@ -25,9 +25,9 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         const ms = (min * std.time.ms_per_min) + (sec * std.time.ms_per_s);
 
         std.log.info("Seeking to {d}:{d:0>2}", .{ min, sec });
-        try api.seekToPosition(client, ms);
+        try api.player.seekToPosition(client, ms);
     } else {
-        const playback_state = try api.getPlaybackState(client);
+        const playback_state = try api.player.getPlaybackState(client);
 
         if (playback_state.item) |track| {
             const progress_ms = playback_state.progress_ms;

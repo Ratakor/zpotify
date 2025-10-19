@@ -12,6 +12,18 @@ arena: std.heap.ArenaAllocator,
 
 const redirect_uri = "http://127.0.0.1:9999/callback";
 const save_filename = "config.json";
+const scopes = [_]api.Scope{
+    .user_read_currently_playing,
+    .user_read_playback_state,
+    .user_modify_playback_state,
+    .user_library_modify,
+    .user_library_read,
+    .user_follow_read,
+    .user_follow_modify,
+    .playlist_read_private,
+    .playlist_modify_public,
+    .playlist_modify_private,
+};
 
 const Save = struct {
     basic_auth: []const u8,
@@ -280,17 +292,13 @@ fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
 
 fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     const scope = comptime blk: {
-        const separator = "+";
-        var buf: [4096]u8 = undefined;
-        @memcpy(buf[0..api.scopes[0].len], api.scopes[0]);
-        var size: usize = api.scopes[0].len;
-        for (api.scopes[1..]) |scope| {
-            @memcpy(buf[size .. size + separator.len], separator);
-            size += separator.len;
-            @memcpy(buf[size .. size + scope.len], scope);
-            size += scope.len;
+        var scopes_str: [scopes.len][]const u8 = undefined;
+        for (scopes, &scopes_str) |scope, *scope_str| {
+            scope_str.* = scope.toString();
         }
-        break :blk buf[0..size];
+        var fba_buffer: [4096]u8 = undefined;
+        var fba: std.heap.FixedBufferAllocator = .init(&fba_buffer);
+        break :blk std.mem.join(fba.allocator(), "+", &scopes_str) catch unreachable;
     };
 
     // TODO: returns INVALID_CLIENT: Invalid client

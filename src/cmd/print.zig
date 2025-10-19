@@ -49,7 +49,7 @@ const default_format =
 ;
 
 pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
-    const playback_state = try api.getPlaybackState(client);
+    const playback_state = try api.player.getPlaybackState(client);
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);

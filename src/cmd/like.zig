@@ -10,7 +10,7 @@ pub const usage =
 ;
 
 pub fn exec(client: *api.Client) !void {
-    const playback_state = try api.getPlaybackState(client);
+    const playback_state = try api.player.getPlaybackState(client);
 
     if (playback_state.item) |track| {
         std.log.info("Adding '{s}' from '{s}' by {s} to your liked songs", .{

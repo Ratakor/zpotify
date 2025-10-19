@@ -10,7 +10,7 @@ pub const usage =
 ;
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    const devices = try api.getDevices(client);
+    const devices = try api.player.getDevices(client);
 
     if (devices.len == 0) {
         std.log.err("No device found", .{});

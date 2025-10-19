@@ -11,5 +11,5 @@ pub const usage =
 
 pub fn exec(client: *api.Client) !void {
     std.log.info("Skipping to next track", .{});
-    try api.skipToNext(client);
+    try api.player.skipToNext(client);
 }

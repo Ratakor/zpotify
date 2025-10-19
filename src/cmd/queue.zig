@@ -21,7 +21,7 @@ fn printTrack(writer: *std.Io.Writer, track: api.Track) !void {
 }
 
 pub fn exec(client: *api.Client) !void {
-    const queue = try api.getQueue(client);
+    const queue = try api.player.getQueue(client);
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);

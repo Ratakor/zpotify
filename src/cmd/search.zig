@@ -292,7 +292,7 @@ fn playFallback() !void {
             return err;
         }
 
-        devices.items = try api.getDevices(current_table.client); // this will be freed at the end of the PROGRAM
+        devices.items = try api.player.getDevices(current_table.client); // this will be freed at the end of the PROGRAM
         devices.selected = 0;
         defer {
             devices.items = null;

@@ -11,7 +11,7 @@ pub const usage =
 ;
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    const playback_state = try api.getPlaybackState(client);
+    const playback_state = try api.player.getPlaybackState(client);
 
     var volume = blk: {
         if (playback_state.device) |device| {
@@ -48,7 +48,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             }
         }
         std.log.info("Setting volume to {d}%", .{volume});
-        try api.setVolume(client, volume);
+        try api.player.setVolume(client, volume);
     } else {
         std.log.info("Volume for {s} is set to {d}%", .{
             playback_state.device.?.name,
