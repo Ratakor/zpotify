@@ -112,3 +112,7 @@ pub fn main() !void {
         std.process.exit(1);
     }
 }
+
+test {
+    std.testing.refAllDecls(@This());
+}

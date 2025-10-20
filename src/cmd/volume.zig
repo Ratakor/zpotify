@@ -6,7 +6,8 @@ pub const description = "Get/Set volume";
 pub const usage =
     \\Usage: zpotify volume [[+/-]0-100]
     \\
-    \\Description: Get/Set volume, prepend +/- to relatively increase/decrease the volume
+    \\Description: Get/Set volume
+    \\             Prepend +/- to relatively increase/decrease the volume
     \\
 ;
 
