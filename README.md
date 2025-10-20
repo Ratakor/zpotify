@@ -45,7 +45,7 @@ Commands:
   repeat      Get/Set repeat mode
   shuffle     Toggle shuffle mode or force it to a specific state
   seek        Get/Set the position of the current track
-  volume      Get/Set volume or increase/decrease volume by 10%
+  volume      Get/Set volume
   like        Add the current track to your liked songs
   queue       Display tracks in the queue
   devices     List all available devices

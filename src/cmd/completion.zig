@@ -94,7 +94,7 @@ const zsh_completion = blk: {
         \\            _arguments -s "2:seconds:(0:00 $(zpotify print {duration} 2>/dev/null))"
         \\            ;;
         \\        vol|volume)
-        \\            _arguments -s "2:volume:(up down $(zpotify print {volume} 2>/dev/null))"
+        \\            _arguments -s "2:volume:(+10 -10 $(zpotify print {volume} 2>/dev/null))"
         \\            ;;
         \\        transfer)
         \\            devices=$(zpotify devices _name 2>/dev/null)
