@@ -152,61 +152,31 @@ pub inline fn sendRequest(
 pub fn sendRequestOwned(
     self: *Client,
     comptime T: type,
-    comptime method: std.http.Method,
+    method: std.http.Method,
     url: []const u8,
     payload: ?[]const u8,
     arena_allocator: std.mem.Allocator,
 ) !T {
-    const uri = try std.Uri.parse(url);
     var fba_buffer: [4096]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
-    const auth_header = try self.getAuthHeader(fba.allocator());
-    var req = try self.http_client.request(method, uri, .{
-        .headers = .{ .authorization = .{ .override = auth_header } },
-    });
-    defer req.deinit();
-
-    if (payload) |pl| {
-        // smh sendBodyComplete requires a []u8 not []const u8
-        // try req.sendBodyComplete(pl);
-        req.transfer_encoding = .{ .content_length = pl.len };
-        var body = try req.sendBodyUnflushed(&.{});
-        try body.writer.writeAll(pl);
-        try body.end();
-        try req.connection.?.flush();
-    } else {
-        try req.sendBodiless();
-    }
-
-    // redirect_buffer is not needed if we have a payload but oh well
-    var redirect_buffer: [8 * 1024]u8 = undefined;
-    var response = try req.receiveHead(&redirect_buffer);
-
-    std.log.debug(
-        "sendRequest({}, {s}): Response status: {t} ({d})",
-        .{ method, url, response.head.status, @intFromEnum(response.head.status) },
-    );
-
-    // usually compressed with gzip
-    var decompress_buffer: [32 * std.compress.flate.max_window_len]u8 = undefined;
-    var transfer_buffer: [64]u8 = undefined;
-    var decompress: std.http.Decompress = undefined;
-    const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
+    var fba: std.heap.FixedBufferAllocator = .init(&fba_buffer);
 
     // debug raw response
     if (false) {
         var stdout = std.fs.File.stdout().writer(&.{});
-        const response_writer = &stdout.interface;
-        _ = reader.streamRemaining(response_writer) catch |err| switch (err) {
-            error.ReadFailed => return response.bodyErr().?,
-            else => |e| return e,
-        };
+        _ = try self.sendRequestRaw(method, url, payload, &stdout.interface);
     }
+
+    var response_writer: std.Io.Writer.Allocating = .init(std.heap.page_allocator);
+    defer response_writer.deinit();
+
+    const result = try self.sendRequestRaw(method, url, payload, &response_writer.writer);
+    var fixed_reader: std.Io.Reader = .fixed(response_writer.written());
+    const reader = &fixed_reader;
 
     var json_reader: std.json.Reader = .init(fba.allocator(), reader);
     defer json_reader.deinit();
 
-    switch (response.head.status) {
+    switch (result.status) {
         .ok => {
             if (T != void) {
                 return std.json.parseFromTokenSourceLeaky(T, arena_allocator, &json_reader, .{
@@ -242,6 +212,39 @@ pub fn sendRequestOwned(
             return error.BadResponse;
         },
     }
+}
+
+pub fn sendRequestRaw(
+    self: *Client,
+    method: std.http.Method,
+    url: []const u8,
+    payload: ?[]const u8,
+    response_writer: ?*std.Io.Writer,
+) !std.http.Client.FetchResult {
+    var fba_buffer: [4096]u8 = undefined;
+    var fba: std.heap.FixedBufferAllocator = .init(&fba_buffer);
+    const auth_header = try self.getAuthHeader(fba.allocator());
+
+    // usually compressed with gzip
+    var decompress_buffer: [32 * std.compress.flate.max_window_len]u8 = undefined;
+
+    const result = try self.http_client.fetch(.{
+        .decompress_buffer = &decompress_buffer,
+        .response_writer = response_writer,
+        .location = .{ .url = url },
+        .method = method,
+        .payload = payload,
+        .headers = .{
+            .authorization = .{ .override = auth_header },
+        },
+    });
+
+    std.log.debug(
+        "zpotify: sendRequest({}, {s}): Response status: {t} ({d})",
+        .{ method, url, result.status, @intFromEnum(result.status) },
+    );
+
+    return result;
 }
 
 fn updateSaveFile(self: Client, file: std.fs.File) !void {
