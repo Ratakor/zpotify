@@ -4,6 +4,7 @@
 // - src/cmd/completion.zig (if needing specific completion)
 // - README.md (Usage)
 
+pub const get = @import("cmd/get.zig");
 pub const print = @import("cmd/print.zig");
 pub const search = @import("cmd/search.zig");
 pub const play = @import("cmd/play.zig");

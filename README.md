@@ -36,6 +36,7 @@ Requires Spotify premium.
 Usage: zpotify [--]<command> [options]
 
 Commands:
+  get         Get data from Spotify
   print       Display current track info in a specific format
   search      Search a track, playlist, album, or artist with a TUI
   play        Play a track, playlist, album, or artist from your library
@@ -97,6 +98,7 @@ Benchmark 2 (43 runs): ./run zpotify
 - [baton](https://github.com/joshuathompson/baton)
 - [zig-spoon](https://git.sr.ht/~leon_plickat/zig-spoon)
 - [chafa](https://github.com/hpjansson/chafa)
+- [spotify-player](https://github.com/aome510/spotify-player)
 
 ## TODO
 

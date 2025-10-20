@@ -199,7 +199,7 @@ pub fn sendRequestOwned(
             if (T != void) {
                 return std.json.parseFromTokenSourceLeaky(T, arena_allocator, &json_reader, .{
                     .allocate = .alloc_always,
-                    .ignore_unknown_fields = true,
+                    .ignore_unknown_fields = true, // TODO: set to false: all fields should be mapped into struct
                 });
             }
         },
