@@ -77,7 +77,9 @@ pub fn main() !void {
     var client = try Client.init(allocator, raw_allocator);
     defer client.deinit();
 
-    if (std.mem.eql(u8, command, "print")) {
+    if (std.mem.eql(u8, command, "get")) {
+        return cmd.get.exec(&client, &args);
+    } else if (std.mem.eql(u8, command, "print")) {
         return cmd.print.exec(&client, &args);
     } else if (std.mem.eql(u8, command, "play")) {
         return cmd.play.exec(&client, raw_allocator, args.next());
