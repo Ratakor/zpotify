@@ -7,7 +7,7 @@ const program_name = "zpotify";
 
 /// Must match the `version` in `build.zig.zon`.
 /// Remove `.pre` when tagging a new release and add it back on the next development cycle.
-const version: std.SemanticVersion = .{ .major = 0, .minor = 4, .patch = 0 };
+const version: std.SemanticVersion = .{ .major = 0, .minor = 5, .patch = 0, .pre = "dev" };
 
 const release_targets = [_]std.Target.Query{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },

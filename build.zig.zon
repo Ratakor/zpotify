@@ -1,6 +1,6 @@
 .{
     .name = .zpotify,
-    .version = "0.4.0",
+    .version = "0.5.0-dev",
     .fingerprint = 0x7c117f9b8cb9acba,
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
