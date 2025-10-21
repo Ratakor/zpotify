@@ -1,6 +1,6 @@
 const std = @import("std");
 const spoon = @import("spoon");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const ui = @import("../ui.zig");
 const help = @import("../cmd.zig").help;
 const Table = ui.Table;
@@ -292,7 +292,7 @@ fn playFallback() !void {
             return err;
         }
 
-        devices.items = try api.getDevices(current_table.client); // this will be freed at the end of the PROGRAM
+        devices.items = try api.player.getDevices(current_table.client); // this will be freed at the end of the PROGRAM
         devices.selected = 0;
         defer {
             devices.items = null;
@@ -358,28 +358,52 @@ fn getFetchFn(kind: Table.Kind) *const fn (*Table) anyerror!void {
 }
 
 fn fetchTracks(self: *Table) !void {
-    const result = try api.search(self.client, self.query, "track", Table.limit, self.len());
+    const result = try api.search(
+        self.client,
+        .{ .raw = self.query },
+        &.{.track},
+        Table.limit,
+        self.len(),
+    );
     try self.list.tracks.appendSlice(self.allocator, result.tracks.?.items);
     self.total = result.tracks.?.total;
     self.has_next = result.tracks.?.next != null;
 }
 
 fn fetchArtists(self: *Table) !void {
-    const result = try api.search(self.client, self.query, "artist", Table.limit, self.len());
+    const result = try api.search(
+        self.client,
+        .{ .raw = self.query },
+        &.{.artist},
+        Table.limit,
+        self.len(),
+    );
     try self.list.artists.appendSlice(self.allocator, result.artists.?.items);
     self.total = result.artists.?.total;
     self.has_next = result.artists.?.next != null;
 }
 
 fn fetchAlbums(self: *Table) !void {
-    const result = try api.search(self.client, self.query, "album", Table.limit, self.len());
+    const result = try api.search(
+        self.client,
+        .{ .raw = self.query },
+        &.{.album},
+        Table.limit,
+        self.len(),
+    );
     try self.list.albums.appendSlice(self.allocator, result.albums.?.items);
     self.total = result.albums.?.total;
     self.has_next = result.albums.?.next != null;
 }
 
 fn fetchPlaylists(self: *Table) !void {
-    const result = try api.search(self.client, self.query, "playlist", Table.limit, self.len());
+    const result = try api.search(
+        self.client,
+        .{ .raw = self.query },
+        &.{.playlist},
+        Table.limit,
+        self.len(),
+    );
     for (result.playlists.?.items) |playlist| {
         if (playlist) |pl| {
             try self.list.playlists.append(self.allocator, pl);

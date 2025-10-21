@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const help = @import("../cmd.zig").help;
 
 pub const description = "Get/Set volume";
@@ -12,7 +12,7 @@ pub const usage =
 ;
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    const playback_state = try api.getPlaybackState(client);
+    const playback_state = try api.player.getPlaybackState(client);
 
     var volume = blk: {
         if (playback_state.device) |device| {
@@ -40,7 +40,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             volume = parseVolume(buf);
         }
         std.log.info("Setting volume to {d}%", .{volume});
-        try api.setVolume(client, volume);
+        try api.player.setVolume(client, volume);
     } else {
         std.log.info("Volume for {s} is set to {d}%", .{
             playback_state.device.?.name,
