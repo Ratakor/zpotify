@@ -357,6 +357,8 @@ pub const PlaybackState = struct {
     device: ?Device = null,
     repeat_state: []const u8 = "off",
     shuffle_state: bool = false,
+    /// undocumented
+    smart_shuffle: ?bool = null,
     context: ?struct {
         type: []const u8 = "",
         href: []const u8 = "",
@@ -379,8 +381,11 @@ pub const PlaybackState = struct {
         toggling_shuffle: ?bool = null,
         toggling_repeat_track: ?bool = null,
         transferring_playback: ?bool = null,
+        /// undocumented
+        disallows: ?struct {
+            resuming: ?bool = null,
+        } = null,
     } = null,
-    // smart_shuffle: ?bool = null,
 };
 
 pub const SearchType = enum {

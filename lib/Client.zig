@@ -178,7 +178,8 @@ pub fn sendRequestOwned(
                     // This **must** be set to false even though it's tempting no to.
                     // I'd rather have some crash when spotify silently change its API than
                     // some error spawning out of nowhere after a few months.
-                    .ignore_unknown_fields = false,
+                    // update: I gave up, spotify API is way too undocumented.
+                    .ignore_unknown_fields = true,
                 });
             }
         },
