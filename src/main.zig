@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Client = @import("Client.zig");
+const api = @import("zpotify");
 const cmd = @import("cmd.zig");
 
 pub const axe = @import("axe").Axe(.{
@@ -26,6 +26,20 @@ pub const usage = blk: {
         });
     }
     break :blk str;
+};
+
+const redirect_uri = "http://127.0.0.1:9999/callback";
+const scopes = [_]api.Scope{
+    .user_read_currently_playing,
+    .user_read_playback_state,
+    .user_modify_playback_state,
+    .user_library_modify,
+    .user_library_read,
+    .user_follow_read,
+    .user_follow_modify,
+    .playlist_read_private,
+    .playlist_modify_public,
+    .playlist_modify_private,
 };
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
@@ -74,7 +88,7 @@ pub fn main() !void {
         return cmd.completion.exec(args.next());
     }
 
-    var client = try Client.init(allocator, raw_allocator);
+    var client = try api.Client.init(redirect_uri, &scopes, allocator, raw_allocator);
     defer client.deinit();
 
     if (std.mem.eql(u8, command, "print")) {

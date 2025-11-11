@@ -6,11 +6,18 @@
     .dependencies = .{
         .spoon = .{
             .path = "vendor/zig-spoon",
+            .lazy = true,
         },
         .axe = .{
             .url = "git+https://github.com/Ratakor/axe#4df48b5fd1bd8496dc3a9ed49790649b7c4e8fee",
             .hash = "axe-0.7.0-M2JU5cyPAADJQcWDZE7xNmnuQtAgwmPLyCMjiLhOptrC",
+            .lazy = true,
         },
     },
-    .paths = .{""},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "lib",
+        "LICENSE",
+    },
 }

@@ -1,3 +1,10 @@
+//! Client for the API
+//! This is basically a helper to
+//! - Do http request with correct authorization header
+//! - Avoid leaking memory with json parsing
+//! - Authenticate the user & save authentication info to a config file
+//! All functions are opinionated feel free to open an issue or a PR to make it more generic
+
 const std = @import("std");
 const api = @import("api.zig");
 
@@ -10,9 +17,7 @@ expiration: i64,
 http_client: std.http.Client,
 arena: std.heap.ArenaAllocator,
 
-const redirect_uri = "http://127.0.0.1:9999/callback";
 const save_filename = "config.json";
-
 const Save = struct {
     basic_auth: []const u8,
     refresh_token: []const u8,
@@ -21,6 +26,8 @@ const Save = struct {
 };
 
 pub fn init(
+    comptime redirect_uri: []const u8,
+    comptime scopes: []const api.Scope,
     http_client_allocator: std.mem.Allocator,
     arena_child_allocator: std.mem.Allocator,
 ) !Client {
@@ -65,6 +72,7 @@ pub fn init(
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
+    // TODO: remove that and only output url from oauth2?
     try stdout.writeAll("Welcome to zpotify!\n");
     try stdout.writeAll("This is probably your first time running zpotify, so we need to authenticate with Spotify.\n");
     try stdout.writeAll("Go to https://developer.spotify.com/dashboard.\n");
@@ -76,7 +84,7 @@ pub fn init(
     const client_secret = try getClientData("Secret", fba_allocator);
     defer fba_allocator.free(client_secret);
 
-    const auth_code = try oauth2(fba_allocator, client_id);
+    const auth_code = try oauth2(redirect_uri, scopes, fba_allocator, client_id);
     defer fba_allocator.free(auth_code);
 
     const basic_auth = blk: {
@@ -113,8 +121,10 @@ pub fn init(
 pub fn deinit(self: *Client) void {
     self.http_client.deinit();
     self.arena.deinit();
+    // all other fields should either be allocated with self.arena or externaly managed
 }
 
+// TODO: use known-folders lib for compatibility
 pub fn getSavePath(allocator: std.mem.Allocator) ![]const u8 {
     if (std.posix.getenv("XDG_DATA_HOME")) |xdg_data| {
         return std.fmt.allocPrint(allocator, "{s}/zpotify/" ++ save_filename, .{xdg_data});
@@ -125,80 +135,50 @@ pub fn getSavePath(allocator: std.mem.Allocator) ![]const u8 {
     }
 }
 
-// don't be dumb and use `std.http.Client.fetch` directly instead of building your own wrapper
-// though it is bugged on zig 0.15.1 https://github.com/ziglang/zig/pull/24926
+// rename all these to fetch, fetchOwned, ...(?)
 pub inline fn sendRequest(
     self: *Client,
     comptime T: type,
-    comptime method: std.http.Method,
+    method: std.http.Method,
     url: []const u8,
-    body: ?[]const u8,
+    payload: ?[]const u8,
 ) !T {
-    return self.sendRequestOwned(T, method, url, body, self.arena.allocator());
+    return self.sendRequestOwned(T, method, url, payload, self.arena.allocator());
 }
 
 pub fn sendRequestOwned(
     self: *Client,
     comptime T: type,
-    comptime method: std.http.Method,
+    method: std.http.Method,
     url: []const u8,
     payload: ?[]const u8,
     arena_allocator: std.mem.Allocator,
 ) !T {
-    const uri = try std.Uri.parse(url);
     var fba_buffer: [4096]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
-    const auth_header = try self.getAuthHeader(fba.allocator());
-    var req = try self.http_client.request(method, uri, .{
-        .headers = .{ .authorization = .{ .override = auth_header } },
-    });
-    defer req.deinit();
-
-    if (payload) |pl| {
-        // smh sendBodyComplete requires a []u8 not []const u8
-        // try req.sendBodyComplete(pl);
-        req.transfer_encoding = .{ .content_length = pl.len };
-        var body = try req.sendBodyUnflushed(&.{});
-        try body.writer.writeAll(pl);
-        try body.end();
-        try req.connection.?.flush();
-    } else {
-        try req.sendBodiless();
-    }
-
-    // redirect_buffer is not needed if we have a payload but oh well
-    var redirect_buffer: [8 * 1024]u8 = undefined;
-    var response = try req.receiveHead(&redirect_buffer);
-
-    std.log.debug(
-        "sendRequest({}, {s}): Response status: {t} ({d})",
-        .{ method, url, response.head.status, @intFromEnum(response.head.status) },
-    );
-
-    // usually compressed with gzip
-    var decompress_buffer: [32 * std.compress.flate.max_window_len]u8 = undefined;
-    var transfer_buffer: [64]u8 = undefined;
-    var decompress: std.http.Decompress = undefined;
-    const reader = response.readerDecompressing(&transfer_buffer, &decompress, &decompress_buffer);
+    var fba: std.heap.FixedBufferAllocator = .init(&fba_buffer);
 
     // debug raw response
     if (false) {
         var stdout = std.fs.File.stdout().writer(&.{});
-        const response_writer = &stdout.interface;
-        _ = reader.streamRemaining(response_writer) catch |err| switch (err) {
-            error.ReadFailed => return response.bodyErr().?,
-            else => |e| return e,
-        };
+        _ = try self.sendRequestWriter(method, url, payload, &stdout.interface);
     }
 
+    const result = try self.sendRequestRaw(method, url, payload, arena_allocator);
+
+    var fixed_reader: std.Io.Reader = .fixed(result.buffer);
+    const reader = &fixed_reader;
     var json_reader: std.json.Reader = .init(fba.allocator(), reader);
     defer json_reader.deinit();
 
-    switch (response.head.status) {
+    switch (result.status) {
         .ok => {
             if (T != void) {
                 return std.json.parseFromTokenSourceLeaky(T, arena_allocator, &json_reader, .{
-                    .allocate = .alloc_always,
+                    .allocate = .alloc_if_needed,
+                    // This **must** be set to false even though it's tempting no to.
+                    // I'd rather have some crash when spotify silently change its API than
+                    // some error spawning out of nowhere after a few months.
+                    // update: I gave up, spotify API is way too undocumented.
                     .ignore_unknown_fields = true,
                 });
             }
@@ -230,6 +210,62 @@ pub fn sendRequestOwned(
             return error.BadResponse;
         },
     }
+}
+
+pub const SendRequestRawResult = struct {
+    buffer: []u8,
+    status: std.http.Status,
+};
+
+pub fn sendRequestRaw(
+    self: *Client,
+    method: std.http.Method,
+    url: []const u8,
+    payload: ?[]const u8,
+    allocator: std.mem.Allocator,
+) !SendRequestRawResult {
+    var response: std.Io.Writer.Allocating = .init(allocator);
+    defer response.deinit();
+
+    const result = try self.sendRequestWriter(method, url, payload, &response.writer);
+
+    return .{
+        .buffer = try response.toOwnedSlice(),
+        .status = result.status,
+    };
+}
+
+pub fn sendRequestWriter(
+    self: *Client,
+    method: std.http.Method,
+    url: []const u8,
+    payload: ?[]const u8,
+    response_writer: ?*std.Io.Writer,
+) !std.http.Client.FetchResult {
+    var fba_buffer: [4096]u8 = undefined;
+    var fba: std.heap.FixedBufferAllocator = .init(&fba_buffer);
+    const auth_header = try self.getAuthHeader(fba.allocator());
+
+    // usually compressed with gzip
+    var decompress_buffer: [32 * std.compress.flate.max_window_len]u8 = undefined;
+
+    const result = try self.http_client.fetch(.{
+        .decompress_buffer = &decompress_buffer,
+        .response_writer = response_writer,
+        .location = .{ .url = url },
+        .method = method,
+        .payload = payload,
+        .headers = .{
+            .authorization = .{ .override = auth_header },
+        },
+    });
+
+    std.log.debug(
+        "zpotify: sendRequest({}, {s}): Response status: {t} ({d})",
+        .{ method, url, result.status, @intFromEnum(result.status) },
+    );
+
+    return result;
 }
 
 fn updateSaveFile(self: Client, file: std.fs.File) !void {
@@ -278,19 +314,20 @@ fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
     std.process.exit(1);
 }
 
-fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
+fn oauth2(
+    comptime redirect_uri: []const u8,
+    comptime scopes: []const api.Scope,
+    allocator: std.mem.Allocator,
+    client_id: []const u8,
+) ![]const u8 {
     const scope = comptime blk: {
-        const separator = "+";
-        var buf: [4096]u8 = undefined;
-        @memcpy(buf[0..api.scopes[0].len], api.scopes[0]);
-        var size: usize = api.scopes[0].len;
-        for (api.scopes[1..]) |scope| {
-            @memcpy(buf[size .. size + separator.len], separator);
-            size += separator.len;
-            @memcpy(buf[size .. size + scope.len], scope);
-            size += scope.len;
+        var scopes_str: [scopes.len][]const u8 = undefined;
+        for (scopes, &scopes_str) |scope, *scope_str| {
+            scope_str.* = scope.toString();
         }
-        break :blk buf[0..size];
+        var fba_buffer: [4096]u8 = undefined;
+        var fba: std.heap.FixedBufferAllocator = .init(&fba_buffer);
+        break :blk std.mem.join(fba.allocator(), "+", &scopes_str) catch unreachable;
     };
 
     // TODO: returns INVALID_CLIENT: Invalid client
@@ -313,6 +350,7 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
         .{client_id},
     );
 
+    // TODO: this is based on redirect URI
     const localhost = try std.net.Address.parseIp4("127.0.0.1", 9999);
     var server = try localhost.listen(.{});
     defer server.deinit();
@@ -334,6 +372,7 @@ fn oauth2(allocator: std.mem.Allocator, client_id: []const u8) ![]const u8 {
     return allocator.dupe(u8, response[start..end]);
 }
 
+// most of this is basically std.http.Client.fetch + JSON parsing
 fn getToken(self: *Client, payload: []const u8) !?[]const u8 {
     const uri = comptime try std.Uri.parse("https://accounts.spotify.com/api/token");
     var fba_buffer: [4096]u8 = undefined;

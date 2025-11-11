@@ -1,6 +1,6 @@
 const std = @import("std");
 const axe = @import("../main.zig").axe;
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const writeTime = @import("../cmd.zig").print.writeTime;
 
 pub const description = "Display infos about the current playback for a waybar module";
@@ -43,7 +43,7 @@ pub fn exec(client: *api.Client, child_allocator: std.mem.Allocator) !void {
         defer std.Thread.sleep(std.time.ns_per_s);
         defer stdout.writeAll("\n") catch {};
 
-        const info = api.getPlaybackStateOwned(client, allocator) catch |err| switch (err) {
+        const info = api.player.getPlaybackStateOwned(client, allocator) catch |err| switch (err) {
             error.PlaybackNotAvailable => continue,
             else => {
                 std.log.scoped(.zpotify).err("{t}", .{err});

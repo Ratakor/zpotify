@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const help = @import("../cmd.zig").help;
 
 pub const description = "Toggle shuffle mode or force it to a specific state";
@@ -23,7 +23,7 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
                 std.process.exit(1);
             }
         } else {
-            const playback_state = try api.getPlaybackState(client);
+            const playback_state = try api.player.getPlaybackState(client);
             break :blk !playback_state.shuffle_state;
         }
     };
@@ -32,5 +32,5 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     } else {
         std.log.info("Disabling shuffle", .{});
     }
-    try api.toggleShuffle(client, state);
+    try api.player.toggleShuffle(client, state);
 }
