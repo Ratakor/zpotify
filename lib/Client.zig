@@ -350,6 +350,7 @@ fn oauth2(
         .{client_id},
     );
 
+    // TODO: this is based on redirect URI
     const localhost = try std.net.Address.parseIp4("127.0.0.1", 9999);
     var server = try localhost.listen(.{});
     defer server.deinit();
