@@ -1,4 +1,5 @@
 //! Based on https://github.com/zigtools/zls/blob/master/build.zig under MIT License.
+// we should probably be using lazyDependency but it doesn't seem to work
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -50,14 +51,14 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
 
-        const axe = b.lazyDependency("axe", .{
+        const axe = b.dependency("axe", .{
             .target = release_target,
             .optimize = optimize,
-        }) orelse return;
-        const spoon = b.lazyDependency("spoon", .{
+        });
+        const spoon = b.dependency("spoon", .{
             .target = release_target,
             .optimize = optimize,
-        }) orelse return;
+        });
 
         const exe_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
@@ -111,14 +112,14 @@ pub fn build(b: *std.Build) void {
     const lib_step = b.step("lib", "Build the library");
     lib_step.dependOn(&b.addInstallArtifact(lib, .{}).step);
 
-    const axe = b.lazyDependency("axe", .{
+    const axe = b.dependency("axe", .{
         .target = target,
         .optimize = optimize,
-    }) orelse return;
-    const spoon = b.lazyDependency("spoon", .{
+    });
+    const spoon = b.dependency("spoon", .{
         .target = target,
         .optimize = optimize,
-    }) orelse return;
+    });
 
     const exe_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
