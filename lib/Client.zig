@@ -10,13 +10,13 @@ const api = @import("api.zig");
 
 const Client = @This();
 
+http_client: std.http.Client,
+arena: *std.heap.ArenaAllocator,
+save_file: ?std.Io.File,
 basic_auth: []const u8,
 refresh_token: []const u8,
 access_token: []const u8,
 expiration: i64,
-http_client: std.http.Client,
-arena: *std.heap.ArenaAllocator,
-save_file: ?std.fs.File,
 
 const Save = struct {
     basic_auth: []const u8,
@@ -28,50 +28,51 @@ const Save = struct {
 pub fn init(
     comptime redirect_uri: []const u8,
     comptime scopes: []const api.Scope,
+    io: std.Io,
     /// Used for all client allocations. Must be thread-safe.
     allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
     save_path_: ?[]const u8,
 ) !Client {
     const arena_allocator = arena.allocator();
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
 
     const save_file = if (save_path_) |save_path|
-        if (cwd.openFile(save_path, .{ .mode = .read_write })) |save_file| blk: {
+        if (cwd.openFile(io, save_path, .{ .mode = .read_write })) |save_file| blk: {
             var save_file_buffer: [1024]u8 = undefined;
-            var save_file_reader = save_file.reader(&save_file_buffer);
+            var save_file_reader = save_file.reader(io, &save_file_buffer);
             var json_reader: std.json.Reader = .init(allocator, &save_file_reader.interface);
             defer json_reader.deinit();
             if (std.json.parseFromTokenSourceLeaky(Save, arena_allocator, &json_reader, .{})) |save_json| {
                 return .{
+                    .http_client = .{ .io = io, .allocator = allocator },
+                    .arena = arena,
+                    .save_file = save_file,
                     .basic_auth = save_json.basic_auth,
                     .refresh_token = save_json.refresh_token,
                     .access_token = save_json.access_token,
                     .expiration = save_json.expiration,
-                    .http_client = .{ .allocator = allocator },
-                    .arena = arena,
-                    .save_file = save_file,
                 };
             } else |_| {
                 // std.log.warn("Failed to parse the save file: {}", .{err});
-                break :blk try cwd.createFile(save_path, .{ .mode = 0o600 });
+                break :blk try cwd.createFile(io, save_path, .{ .permissions = .fromMode(0o600) });
             }
         } else |err| blk: {
             if (err != error.FileNotFound) {
                 return err;
             }
-            try cwd.makePath(std.fs.path.dirname(save_path).?);
-            break :blk try cwd.createFile(save_path, .{ .mode = 0o600 });
+            try cwd.createDirPath(io, std.fs.path.dirname(save_path).?);
+            break :blk try cwd.createFile(io, save_path, .{ .permissions = .fromMode(0o600) });
         }
     else
         null;
     errdefer if (save_path_) |save_path| {
-        save_file.?.close();
-        cwd.deleteFile(save_path) catch {};
+        save_file.?.close(io);
+        cwd.deleteFile(io, save_path) catch {};
     };
 
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
     // TODO: remove that and only output url from oauth2?
     // This is part of the opinionated and intrusive part.
@@ -81,12 +82,12 @@ pub fn init(
     try stdout.writeAll("Create a new app, name and description doesn't matter but redirect URI must be '" ++ redirect_uri ++ "'.\n");
     try stdout.writeAll("Enter the following informations:\n");
     try stdout.flush();
-    const client_id = try getClientData("ID", allocator);
+    const client_id = try getClientData("ID", io, allocator);
     defer allocator.free(client_id);
-    const client_secret = try getClientData("Secret", allocator);
+    const client_secret = try getClientData("Secret", io, allocator);
     defer allocator.free(client_secret);
 
-    const oauth2_result = try oauth2(redirect_uri, scopes, allocator, client_id);
+    const oauth2_result = try oauth2(redirect_uri, scopes, io, allocator, client_id);
     const auth_code = oauth2_result.auth_code;
     const code_verifier = oauth2_result.code_verifier;
     defer allocator.free(auth_code);
@@ -102,13 +103,13 @@ pub fn init(
     };
 
     var client: Client = .{
+        .http_client = .{ .io = io, .allocator = allocator },
+        .arena = arena,
+        .save_file = save_file,
         .basic_auth = basic_auth,
         .refresh_token = undefined,
         .access_token = undefined,
         .expiration = undefined,
-        .http_client = .{ .allocator = allocator },
-        .arena = arena,
-        .save_file = save_file,
     };
     const body = try std.fmt.allocPrint(
         allocator,
@@ -127,10 +128,10 @@ pub fn init(
 /// Release all associated resources with the client.
 /// WARN: The given arena is expected to be managed externally.
 pub fn deinit(self: *Client) void {
-    self.http_client.deinit();
     if (self.save_file) |save_file| {
-        save_file.close();
+        save_file.close(self.http_client.io);
     }
+    self.http_client.deinit();
 }
 
 // rename all these to fetch, fetchOwned, ...(?)
@@ -278,17 +279,17 @@ fn updateSaveFile(self: Client) !void {
             .expiration = self.expiration,
         };
         var buffer: [1024]u8 = undefined;
-        var writer = file.writer(&buffer);
+        var writer = file.writer(self.http_client.io, &buffer);
         try writer.interface.print("{f}", .{std.json.fmt(save, .{})});
         try writer.end();
     }
 }
 
-fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+fn getClientData(name: []const u8, io: std.Io, allocator: std.mem.Allocator) ![]const u8 {
     var stdin_buffer: [64]u8 = undefined;
-    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    var stdin_reader = std.Io.File.stdin().reader(io, &stdin_buffer);
     const stdin = &stdin_reader.interface;
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.Io.File.stdout().writer(io, &.{});
     const stdout = &stdout_writer.interface;
 
     const max_retries = 5;
@@ -321,9 +322,10 @@ fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
 // cryptographic random string with a length between 43 and 128 characters
 // (the longer the better). It can contain letters, digits, underscores,
 // periods, hyphens, or tildes.
-fn generateRandomString(allocator: std.mem.Allocator) ![]const u8 {
+fn generateRandomString(io: std.Io, allocator: std.mem.Allocator) ![]const u8 {
     const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~";
-    var prng: std.Random.DefaultPrng = .init(@bitCast(std.time.microTimestamp()));
+    const seed: i64 = @truncate(std.Io.Timestamp.now(io, .real).nanoseconds);
+    var prng = std.Random.DefaultPrng.init(@bitCast(seed));
     const rand = prng.random();
 
     // that could be constant, like 64
@@ -340,6 +342,7 @@ fn generateRandomString(allocator: std.mem.Allocator) ![]const u8 {
 fn oauth2(
     comptime redirect_uri: []const u8,
     comptime scopes: []const api.Scope,
+    io: std.Io,
     allocator: std.mem.Allocator,
     client_id: []const u8,
 ) !struct {
@@ -356,7 +359,7 @@ fn oauth2(
         break :blk std.mem.join(fba.allocator(), "+", &scopes_str) catch unreachable;
     };
 
-    const code_verifier = try generateRandomString(allocator);
+    const code_verifier = try generateRandomString(io, allocator);
     errdefer allocator.free(code_verifier);
     var hashed: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
     std.crypto.hash.sha2.Sha256.hash(code_verifier, &hashed, .{});
@@ -391,21 +394,18 @@ fn oauth2(
         const host = switch (uri.host.?) {
             .raw, .percent_encoded => |s| s,
         };
-        break :blk try std.net.Address.parseIp4(host, uri.port.?);
+        break :blk try std.Io.net.IpAddress.parseIp4(host, uri.port.?);
     };
-    var server = try localhost.listen(.{});
-    defer server.deinit();
+    var server = try localhost.listen(io, .{});
+    defer server.deinit(io);
 
-    const fork_pid = try std.posix.fork();
-    if (fork_pid == 0) {
-        return std.process.execv(allocator, &[_][]const u8{ "xdg-open", url });
-    }
+    _ = try std.process.spawn(io, .{ .argv = &.{ "xdg-open", url } });
     std.log.info("Opened {s} in your browser, close the window if it is lagging.", .{url});
 
-    var client = try server.accept();
-    defer client.stream.close();
-    var reader = client.stream.reader(&.{});
-    const size = try reader.interface().readSliceShort(&buffer);
+    var client = try server.accept(io);
+    defer client.close(io);
+    var reader = client.reader(io, &.{});
+    const size = try reader.interface.readSliceShort(&buffer);
     const response = buffer[0..size];
     const start = std.mem.indexOf(u8, response, "code=").? + "code=".len;
     const end = std.mem.indexOfScalar(u8, response[start..], ' ').? + start;
@@ -476,7 +476,7 @@ fn getToken(self: *Client, payload: []const u8) !?[]const u8 {
         const Response = struct {
             access_token: []const u8,
             token_type: []const u8,
-            expires_in: u64,
+            expires_in: i64,
             scope: []const u8,
             refresh_token: ?[]const u8 = null,
         };
@@ -487,7 +487,7 @@ fn getToken(self: *Client, payload: []const u8) !?[]const u8 {
             .{},
         );
         self.access_token = json.access_token;
-        self.expiration = std.time.timestamp() + @as(i64, @intCast(json.expires_in));
+        self.expiration = std.Io.Timestamp.now(self.http_client.io, .real).toSeconds() + json.expires_in;
         if (json.refresh_token) |refresh_token| {
             return refresh_token;
         } else {
@@ -497,7 +497,7 @@ fn getToken(self: *Client, payload: []const u8) !?[]const u8 {
 }
 
 fn getAuthHeader(self: *Client, allocator: std.mem.Allocator) ![]const u8 {
-    if (self.expiration <= std.time.timestamp()) {
+    if (self.expiration <= std.Io.Timestamp.now(self.http_client.io, .real).toSeconds()) {
         const body = try std.fmt.allocPrint(
             allocator,
             "grant_type=refresh_token&refresh_token={s}",

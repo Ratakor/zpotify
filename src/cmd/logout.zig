@@ -1,4 +1,5 @@
 const std = @import("std");
+const cmd = @import("../cmd.zig");
 const save = @import("../save.zig");
 
 pub const description = "Remove the stored credentials from the config file";
@@ -9,10 +10,10 @@ pub const usage =
     \\
 ;
 
-pub fn exec(allocator: std.mem.Allocator) !void {
-    const save_path = try save.getPath(allocator);
-    defer allocator.free(save_path);
-    std.fs.deleteFileAbsolute(save_path) catch |err| {
+pub fn exec(ctx: *cmd.Context) !void {
+    const save_path = try save.getPath(ctx.allocator, ctx.env_map);
+    defer ctx.allocator.free(save_path);
+    std.Io.Dir.deleteFileAbsolute(ctx.io, save_path) catch |err| {
         if (err != error.FileNotFound) {
             return err;
         }
