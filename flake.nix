@@ -7,40 +7,40 @@
       url = "github:silversquirl/zig-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    zls = {
-      url = "github:zigtools/zls";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        zig-flake.follows = "zig";
-      };
-    };
   };
 
   outputs =
-    { self, nixpkgs, ... }@inputs:
+    {
+      nixpkgs,
+      self,
+      zig,
+    }:
     let
-      forAllSystems = f: builtins.mapAttrs f nixpkgs.legacyPackages;
-      zigVersion = "zig_${(import ./nix/version.nix nixpkgs.lib).zigVersion}";
+      inherit (import ./nix/version.nix nixpkgs.lib) zigVersion;
+      forAllSystems =
+        f:
+        builtins.mapAttrs (
+          system: pkgs: f pkgs zig.packages.${system}."zig_${zigVersion}"
+        ) nixpkgs.legacyPackages;
     in
     {
       packages = forAllSystems (
-        system: pkgs: {
-          default = self.packages.${system}.zpotify;
-          zpotify = pkgs.callPackage ./nix/package.nix {
-            zig = inputs.zig.packages.${system}.${zigVersion};
+        pkgs: zig: {
+          default = pkgs.callPackage ./nix/package.nix {
+            inherit zig;
           };
         }
       );
 
       devShells = forAllSystems (
-        system: pkgs: {
+        pkgs: zig: {
           default = pkgs.callPackage ./nix/shell.nix {
-            zig = inputs.zig.packages.${system}.${zigVersion};
-            zls = inputs.zls.packages.${system}.default;
+            inherit zig;
+            inherit (zig) zls;
           };
         }
       );
 
-      formatter = forAllSystems (_: pkgs: pkgs.nixfmt-tree);
+      formatter = forAllSystems (pkgs: zig: pkgs.nixfmt-tree);
     };
 }
