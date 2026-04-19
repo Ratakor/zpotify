@@ -18,7 +18,6 @@ pub const like = @import("cmd/like.zig");
 pub const queue = @import("cmd/queue.zig");
 pub const devices = @import("cmd/devices.zig");
 pub const transfer = @import("cmd/transfer.zig");
-pub const waybar = @import("cmd/waybar.zig");
 pub const logout = @import("cmd/logout.zig");
 pub const completion = @import("cmd/completion.zig");
 pub const help = @import("cmd/help.zig");

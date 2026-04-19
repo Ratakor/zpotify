@@ -50,7 +50,6 @@ Commands:
   queue       Display tracks in the queue
   devices     List all available devices
   transfer    Transfer playback to another device
-  waybar      Display infos about the current playback for a waybar module
   logout      Remove the stored credentials from the config file
   completion  Generate shell completion script
   help        Display information about a command

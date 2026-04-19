@@ -8,11 +8,6 @@ pub fn getPlaybackState(client: *Client) !api.PlaybackState {
     return client.sendRequest(api.PlaybackState, .GET, api.api_url ++ "/me/player", null);
 }
 
-// TODO: this should be removed
-pub fn getPlaybackStateOwned(client: *Client, arena: std.mem.Allocator) !api.PlaybackState {
-    return client.sendRequestOwned(api.PlaybackState, .GET, api.api_url ++ "/me/player", null, arena);
-}
-
 /// https://developer.spotify.com/documentation/web-api/reference/transfer-a-users-playback
 /// scopes: user-modify-playback-state
 // TODO: add `play` argument in body

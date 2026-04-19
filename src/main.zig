@@ -119,8 +119,6 @@ pub fn main() !void {
         return cmd.devices.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "transfer")) {
         return cmd.transfer.exec(&client, args.next());
-    } else if (std.mem.eql(u8, command, "waybar")) {
-        return cmd.waybar.exec(&client, raw_allocator);
     } else {
         try cmd.help.exec(command);
         std.process.exit(1);
