@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("zpotify");
+const save = @import("../save.zig");
 
 pub const description = "Remove the stored credentials from the config file";
 pub const usage =
@@ -10,7 +10,7 @@ pub const usage =
 ;
 
 pub fn exec(allocator: std.mem.Allocator) !void {
-    const save_path = try api.Client.getSavePath(allocator);
+    const save_path = try save.getPath(allocator);
     defer allocator.free(save_path);
     std.fs.deleteFileAbsolute(save_path) catch |err| {
         if (err != error.FileNotFound) {

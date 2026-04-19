@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const api = @import("zpotify");
 const cmd = @import("cmd.zig");
+const save = @import("save.zig");
 
 pub const axe = @import("axe").Axe(.{
     .mutex = .{ .function = .progress_stderr },
@@ -64,6 +65,9 @@ pub fn main() !void {
         _ = debug_allocator.deinit();
     };
 
+    var arena = std.heap.ArenaAllocator.init(raw_allocator);
+    defer arena.deinit();
+
     axe.init(allocator, null, null) catch unreachable;
     defer axe.deinit(allocator);
 
@@ -88,7 +92,9 @@ pub fn main() !void {
         return cmd.completion.exec(args.next());
     }
 
-    var client = try api.Client.init(redirect_uri, &scopes, allocator, raw_allocator);
+    const save_path = try save.getPath(allocator);
+    defer allocator.free(save_path);
+    var client = try api.Client.init(redirect_uri, &scopes, allocator, &arena, save_path);
     defer client.deinit();
 
     if (std.mem.eql(u8, command, "print")) {

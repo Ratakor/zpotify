@@ -15,9 +15,9 @@ refresh_token: []const u8,
 access_token: []const u8,
 expiration: i64,
 http_client: std.http.Client,
-arena: std.heap.ArenaAllocator,
+arena: *std.heap.ArenaAllocator,
+save_file: ?std.fs.File,
 
-const save_filename = "config.json";
 const Save = struct {
     basic_auth: []const u8,
     refresh_token: []const u8,
@@ -28,64 +28,66 @@ const Save = struct {
 pub fn init(
     comptime redirect_uri: []const u8,
     comptime scopes: []const api.Scope,
-    http_client_allocator: std.mem.Allocator,
-    arena_child_allocator: std.mem.Allocator,
+    /// Used for all client allocations. Must be thread-safe.
+    allocator: std.mem.Allocator,
+    arena: *std.heap.ArenaAllocator,
+    save_path_: ?[]const u8,
 ) !Client {
-    var fba_buffer: [4096]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&fba_buffer);
-    const fba_allocator = fba.allocator();
-    var arena = std.heap.ArenaAllocator.init(arena_child_allocator);
     const arena_allocator = arena.allocator();
-
-    const save_path = try getSavePath(fba_allocator);
-    defer fba_allocator.free(save_path);
     const cwd = std.fs.cwd();
-    const save_file = if (cwd.openFile(save_path, .{ .mode = .read_write })) |save_file| blk: {
-        defer save_file.close();
-        var save_file_buffer: [1024]u8 = undefined;
-        var save_file_reader = save_file.reader(&save_file_buffer);
-        var json_reader: std.json.Reader = .init(fba_allocator, &save_file_reader.interface);
-        defer json_reader.deinit();
-        if (std.json.parseFromTokenSourceLeaky(Save, arena_allocator, &json_reader, .{})) |save_json| {
-            return .{
-                .basic_auth = save_json.basic_auth,
-                .refresh_token = save_json.refresh_token,
-                .access_token = save_json.access_token,
-                .expiration = save_json.expiration,
-                .http_client = .{ .allocator = http_client_allocator },
-                .arena = arena,
-            };
-        } else |err| {
-            std.log.warn("Failed to parse the save file: {}", .{err});
+
+    const save_file = if (save_path_) |save_path|
+        if (cwd.openFile(save_path, .{ .mode = .read_write })) |save_file| blk: {
+            var save_file_buffer: [1024]u8 = undefined;
+            var save_file_reader = save_file.reader(&save_file_buffer);
+            var json_reader: std.json.Reader = .init(allocator, &save_file_reader.interface);
+            defer json_reader.deinit();
+            if (std.json.parseFromTokenSourceLeaky(Save, arena_allocator, &json_reader, .{})) |save_json| {
+                return .{
+                    .basic_auth = save_json.basic_auth,
+                    .refresh_token = save_json.refresh_token,
+                    .access_token = save_json.access_token,
+                    .expiration = save_json.expiration,
+                    .http_client = .{ .allocator = allocator },
+                    .arena = arena,
+                    .save_file = save_file,
+                };
+            } else |_| {
+                // std.log.warn("Failed to parse the save file: {}", .{err});
+                break :blk try cwd.createFile(save_path, .{ .mode = 0o600 });
+            }
+        } else |err| blk: {
+            if (err != error.FileNotFound) {
+                return err;
+            }
+            try cwd.makePath(std.fs.path.dirname(save_path).?);
             break :blk try cwd.createFile(save_path, .{ .mode = 0o600 });
         }
-    } else |err| blk: {
-        if (err != error.FileNotFound) {
-            return err;
-        }
-        try cwd.makePath(save_path[0 .. save_path.len - save_filename.len]);
-        break :blk try cwd.createFile(save_path, .{ .mode = 0o600 });
+    else
+        null;
+    errdefer if (save_path_) |save_path| {
+        save_file.?.close();
+        cwd.deleteFile(save_path) catch {};
     };
-    errdefer cwd.deleteFile(save_path) catch {};
-    defer save_file.close();
 
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
     // TODO: remove that and only output url from oauth2?
+    // This is part of the opinionated and intrusive part.
     try stdout.writeAll("Welcome to zpotify!\n");
     try stdout.writeAll("This is probably your first time running zpotify, so we need to authenticate with Spotify.\n");
     try stdout.writeAll("Go to https://developer.spotify.com/dashboard.\n");
     try stdout.writeAll("Create a new app, name and description doesn't matter but redirect URI must be '" ++ redirect_uri ++ "'.\n");
     try stdout.writeAll("Enter the following informations:\n");
     try stdout.flush();
-    const client_id = try getClientData("ID", fba_allocator);
-    defer fba_allocator.free(client_id);
-    const client_secret = try getClientData("Secret", fba_allocator);
-    defer fba_allocator.free(client_secret);
+    const client_id = try getClientData("ID", allocator);
+    defer allocator.free(client_id);
+    const client_secret = try getClientData("Secret", allocator);
+    defer allocator.free(client_secret);
 
-    const auth_code = try oauth2(redirect_uri, scopes, fba_allocator, client_id);
-    defer fba_allocator.free(auth_code);
+    const auth_code = try oauth2(redirect_uri, scopes, allocator, client_id);
+    defer allocator.free(auth_code);
 
     const basic_auth = blk: {
         var buf: [32 + 1 + 32]u8 = undefined;
@@ -101,37 +103,29 @@ pub fn init(
         .refresh_token = undefined,
         .access_token = undefined,
         .expiration = undefined,
-        .http_client = .{ .allocator = http_client_allocator },
+        .http_client = .{ .allocator = allocator },
         .arena = arena,
+        .save_file = save_file,
     };
     const body = try std.fmt.allocPrint(
-        fba_allocator,
+        allocator,
         "grant_type=authorization_code&code={s}&redirect_uri=" ++ redirect_uri,
         .{auth_code},
     );
-    defer fba_allocator.free(body);
+    defer allocator.free(body);
     client.refresh_token = (try client.getToken(body)).?;
 
-    try client.updateSaveFile(save_file);
-    std.log.info("Your informations have been saved to '{s}'.", .{save_path});
+    try client.updateSaveFile();
 
     return client;
 }
 
+/// Release all associated resources with the client.
+/// WARN: The given arena is expected to be managed externally.
 pub fn deinit(self: *Client) void {
     self.http_client.deinit();
-    self.arena.deinit();
-    // all other fields should either be allocated with self.arena or externaly managed
-}
-
-// TODO: use known-folders lib for compatibility
-pub fn getSavePath(allocator: std.mem.Allocator) ![]const u8 {
-    if (std.posix.getenv("XDG_DATA_HOME")) |xdg_data| {
-        return std.fmt.allocPrint(allocator, "{s}/zpotify/" ++ save_filename, .{xdg_data});
-    } else if (std.posix.getenv("HOME")) |home| {
-        return std.fmt.allocPrint(allocator, "{s}/.local/share/zpotify/" ++ save_filename, .{home});
-    } else {
-        return error.EnvironmentVariableNotFound;
+    if (self.save_file) |save_file| {
+        save_file.close();
     }
 }
 
@@ -260,25 +254,27 @@ pub fn sendRequestWriter(
         },
     });
 
-    std.log.debug(
-        "zpotify: sendRequest({}, {s}): Response status: {t} ({d})",
-        .{ method, url, result.status, @intFromEnum(result.status) },
-    );
+    // std.log.debug(
+    //     "zpotify: sendRequest({}, {s}): Response status: {t} ({d})",
+    //     .{ method, url, result.status, @intFromEnum(result.status) },
+    // );
 
     return result;
 }
 
-fn updateSaveFile(self: Client, file: std.fs.File) !void {
-    const save: Save = .{
-        .basic_auth = self.basic_auth,
-        .refresh_token = self.refresh_token,
-        .access_token = self.access_token,
-        .expiration = self.expiration,
-    };
-    // try file.seekTo(0);
-    // var writer = file.writerStreaming(&.{});
-    var writer = file.writer(&.{});
-    try writer.interface.print("{f}", .{std.json.fmt(save, .{})});
+fn updateSaveFile(self: Client) !void {
+    if (self.save_file) |file| {
+        const save: Save = .{
+            .basic_auth = self.basic_auth,
+            .refresh_token = self.refresh_token,
+            .access_token = self.access_token,
+            .expiration = self.expiration,
+        };
+        var buffer: [1024]u8 = undefined;
+        var writer = file.writer(&buffer);
+        try writer.interface.print("{f}", .{std.json.fmt(save, .{})});
+        try writer.end();
+    }
 }
 
 fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
@@ -310,8 +306,7 @@ fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
         }
         return allocator.dupe(u8, data);
     }
-    std.log.err("Too many retries", .{});
-    std.process.exit(1);
+    return error.TooManyRetries;
 }
 
 fn oauth2(
@@ -350,14 +345,20 @@ fn oauth2(
         .{client_id},
     );
 
-    // TODO: this is based on redirect URI
-    const localhost = try std.net.Address.parseIp4("127.0.0.1", 9999);
+    const localhost = comptime blk: {
+        @setEvalBranchQuota(10_000);
+        const uri = try std.Uri.parse(redirect_uri);
+        const host = switch (uri.host.?) {
+            .raw, .percent_encoded => |s| s,
+        };
+        break :blk try std.net.Address.parseIp4(host, uri.port.?);
+    };
     var server = try localhost.listen(.{});
     defer server.deinit();
 
     const fork_pid = try std.posix.fork();
     if (fork_pid == 0) {
-        std.process.execv(allocator, &[_][]const u8{ "xdg-open", url }) catch unreachable;
+        return std.process.execv(allocator, &[_][]const u8{ "xdg-open", url });
     }
     std.log.info("Opened {s} in your browser, close the window if it is lagging.", .{url});
 
@@ -463,11 +464,7 @@ fn getAuthHeader(self: *Client, allocator: std.mem.Allocator) ![]const u8 {
         if (try self.getToken(body)) |new_refresh_token| {
             self.refresh_token = new_refresh_token;
         }
-        const save_path = try getSavePath(allocator);
-        defer allocator.free(save_path);
-        const save_file = try std.fs.openFileAbsolute(save_path, .{ .mode = .write_only });
-        defer save_file.close();
-        try self.updateSaveFile(save_file);
+        try self.updateSaveFile();
     }
     return std.fmt.allocPrint(allocator, "Bearer {s}", .{self.access_token});
 }
