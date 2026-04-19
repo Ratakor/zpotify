@@ -14,8 +14,8 @@
     // ```
     .dependencies = .{
         .axe = .{
-            .url = "git+https://github.com/Ratakor/axe#4492b8401f603f8444620b0b5bb039cdb312049b",
-            .hash = "axe-0.8.0-M2JU5TSRAADWArXWoguF9hbnO-BX02rG3iFeyItCBKej",
+            .url = "git+https://github.com/Ratakor/axe#186078c497e4e4dab20926c1b135fa9ab8a6a3b1",
+            .hash = "axe-0.8.0-M2JU5SuRAABRUbICFInh_GltUm46JBd986HQCE7j6BJz",
         },
     },
     .paths = .{

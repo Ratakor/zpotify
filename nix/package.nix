@@ -4,6 +4,7 @@
   callPackage,
   installShellFiles,
   zig,
+  releaseMode ? "safe",
 }:
 let
   fs = lib.fileset;
@@ -16,25 +17,40 @@ stdenv.mkDerivation (finalAttrs: {
     root = ../.;
     fileset = fs.unions [
       ../src
-      ../vendor
+      ../lib
       ../build.zig
       ../build.zig.zon
     ];
   };
 
-  deps = callPackage ./deps.nix { };
-
-  zigBuildFlags = [
-    "--system"
-    "${finalAttrs.deps}"
-    # "--release=fast"
-    "-Dversion-string=${finalAttrs.version}"
-  ];
-
   nativeBuildInputs = [
     installShellFiles
-    zig.hook
+    zig
   ];
+
+  dontInstall = true;
+  doCheck = true;
+
+  configurePhase = ''
+    export ZIG_GLOBAL_CACHE_DIR=$TEMP/.cache
+    PACKAGE_DIR=${callPackage ./deps.nix { }}
+  '';
+
+  buildPhase = ''
+    zig build install \
+      --system $PACKAGE_DIR \
+      --release=${releaseMode} \
+      -Dversion-string=${finalAttrs.version} \
+      --color off \
+      --prefix $out
+  '';
+
+  checkPhase = ''
+    zig build test \
+      --system $PACKAGE_DIR \
+      -Dversion-string=${finalAttrs.version} \
+      --color off
+  '';
 
   postInstall = ''
     installShellCompletion --cmd zpotify \
