@@ -26,7 +26,6 @@ pub fn build(b: *std.Build) void {
     const pie = b.option(bool, "pie", "Build a Position Independent Executable");
     const strip = b.option(bool, "strip", "Strip executable");
     const use_llvm = b.option(bool, "use-llvm", "Use Zig's llvm code backend");
-    const image_support = b.option(bool, "image-support", "Build with image support (requires chafa and libjpeg)") orelse false;
 
     const resolved_version = getVersion(b);
 
@@ -35,12 +34,10 @@ pub fn build(b: *std.Build) void {
         options.addOption([]const u8, "program_name", program_name);
         options.addOption(std.SemanticVersion, "version", resolved_version);
         options.addOption([]const u8, "version_string", b.fmt("{f}", .{resolved_version}));
-        options.addOption(bool, "image_support", image_support);
         break :blk options.createModule();
     };
 
     // zig build release
-    // -Dimage-support=false -Dstrip=true --release=fast
     var release_artifacts: [release_targets.len]*std.Build.Step.Compile = undefined;
     for (release_targets, &release_artifacts) |target_query, *artifact| {
         const release_target = b.resolveTargetQuery(target_query);
@@ -55,24 +52,19 @@ pub fn build(b: *std.Build) void {
             .target = release_target,
             .optimize = optimize,
         });
-        const spoon = b.dependency("spoon", .{
-            .target = release_target,
-            .optimize = optimize,
-        });
 
         const exe_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = release_target,
-            .optimize = optimize,
+            .optimize = .ReleaseFast,
             .single_threaded = single_threaded,
             .pic = pie,
-            .strip = strip,
-            .omit_frame_pointer = strip,
+            .strip = true,
+            .omit_frame_pointer = true,
             .imports = &.{
                 .{ .name = "build_options", .module = build_options },
                 .{ .name = "zpotify", .module = lib_module },
                 .{ .name = "axe", .module = axe.module("axe") },
-                .{ .name = "spoon", .module = spoon.module("spoon") },
             },
         });
 
@@ -82,12 +74,6 @@ pub fn build(b: *std.Build) void {
             .use_llvm = use_llvm,
             .use_lld = use_llvm,
         });
-        if (image_support) {
-            artifact.*.linkLibC();
-            artifact.*.linkSystemLibrary("glib-2.0");
-            artifact.*.linkSystemLibrary("chafa");
-            artifact.*.linkSystemLibrary("libjpeg");
-        }
     }
     release(b, &release_artifacts, resolved_version);
 
@@ -116,10 +102,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const spoon = b.dependency("spoon", .{
-        .target = target,
-        .optimize = optimize,
-    });
 
     const exe_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -133,7 +115,6 @@ pub fn build(b: *std.Build) void {
             .{ .name = "build_options", .module = build_options },
             .{ .name = "zpotify", .module = lib_module },
             .{ .name = "axe", .module = axe.module("axe") },
-            .{ .name = "spoon", .module = spoon.module("spoon") },
         },
     });
 
@@ -144,12 +125,6 @@ pub fn build(b: *std.Build) void {
         .use_llvm = use_llvm,
         .use_lld = use_llvm,
     });
-    if (image_support) {
-        exe.linkLibC();
-        exe.linkSystemLibrary("glib-2.0");
-        exe.linkSystemLibrary("chafa");
-        exe.linkSystemLibrary("libjpeg");
-    }
     b.installArtifact(exe);
 
     // zib build run
@@ -169,11 +144,7 @@ pub fn build(b: *std.Build) void {
 
     // zig build fmt
     const fmt_step = b.step("fmt", "Format all source files");
-    fmt_step.dependOn(&b.addFmt(.{ .paths = &.{
-        "build.zig",
-        "src",
-        "vendor/zig-spoon",
-    } }).step);
+    fmt_step.dependOn(&b.addFmt(.{ .paths = &.{ "build.zig", "src" } }).step);
 }
 
 /// Returns `MAJOR.MINOR.PATCH-dev` when `git describe` failed.

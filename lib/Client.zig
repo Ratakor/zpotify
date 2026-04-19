@@ -245,6 +245,9 @@ pub fn sendRequestWriter(
     const auth_header = try self.getAuthHeader(fba.allocator());
 
     // usually compressed with gzip
+    // so this needs to be at least:
+    // - 8 * std.compress.flate.max_window_len for `play track`
+    // - 32 * std.compress.flate.max_window_len for `play album`
     var decompress_buffer: [32 * std.compress.flate.max_window_len]u8 = undefined;
 
     const result = try self.http_client.fetch(.{
