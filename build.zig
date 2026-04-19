@@ -49,14 +49,15 @@ pub fn build(b: *std.Build) void {
             .target = release_target,
             .optimize = optimize,
         });
-        const axe_module = b.lazyDependency("axe", .{
+
+        const axe = b.lazyDependency("axe", .{
             .target = release_target,
             .optimize = optimize,
-        }).?.module("axe");
-        const spoon_module = b.lazyDependency("spoon", .{
+        }) orelse return;
+        const spoon = b.lazyDependency("spoon", .{
             .target = release_target,
             .optimize = optimize,
-        }).?.module("spoon");
+        }) orelse return;
 
         const exe_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
@@ -69,8 +70,8 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "build_options", .module = build_options },
                 .{ .name = "zpotify", .module = lib_module },
-                .{ .name = "axe", .module = axe_module },
-                .{ .name = "spoon", .module = spoon_module },
+                .{ .name = "axe", .module = axe.module("axe") },
+                .{ .name = "spoon", .module = spoon.module("spoon") },
             },
         });
 
@@ -110,14 +111,14 @@ pub fn build(b: *std.Build) void {
     const lib_step = b.step("lib", "Build the library");
     lib_step.dependOn(&b.addInstallArtifact(lib, .{}).step);
 
-    const axe_module = b.lazyDependency("axe", .{
+    const axe = b.lazyDependency("axe", .{
         .target = target,
         .optimize = optimize,
-    }).?.module("axe");
-    const spoon_module = b.lazyDependency("spoon", .{
+    }) orelse return;
+    const spoon = b.lazyDependency("spoon", .{
         .target = target,
         .optimize = optimize,
-    }).?.module("spoon");
+    }) orelse return;
 
     const exe_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -130,8 +131,8 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "build_options", .module = build_options },
             .{ .name = "zpotify", .module = lib_module },
-            .{ .name = "axe", .module = axe_module },
-            .{ .name = "spoon", .module = spoon_module },
+            .{ .name = "axe", .module = axe.module("axe") },
+            .{ .name = "spoon", .module = spoon.module("spoon") },
         },
     });
 
