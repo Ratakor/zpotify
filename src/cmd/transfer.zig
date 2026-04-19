@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const help = @import("../cmd.zig").help;
 
 pub const description = "Transfer playback to another device";
@@ -13,12 +13,12 @@ pub const usage =
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     if (arg) |dev| {
-        const devices = try api.getDevices(client);
+        const devices = try api.player.getDevices(client);
         for (devices) |device| {
             if (device.id) |id| {
                 if (std.mem.eql(u8, device.name, dev) or std.mem.eql(u8, id, dev)) {
                     std.log.info("Transferring playback to {s}", .{device.name});
-                    try api.transferPlayback(client, id);
+                    try api.player.transferPlayback(client, id);
                     return;
                 }
             }

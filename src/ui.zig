@@ -1,7 +1,7 @@
 const std = @import("std");
 const spoon = @import("spoon");
 const image_support = @import("build_options").image_support;
-const api = @import("api.zig");
+const api = @import("zpotify");
 const c = if (image_support) @cImport({
     @cInclude("stdio.h");
     @cInclude("jpeglib.h");
@@ -237,7 +237,7 @@ pub const Table = struct {
     list: union(enum) {
         tracks: std.ArrayList(api.Track),
         artists: std.ArrayList(api.Artist),
-        albums: std.ArrayList(api.Album),
+        albums: std.ArrayList(api.SimplifiedAlbum),
         playlists: std.ArrayList(api.Playlist),
     },
     client: *api.Client,
@@ -258,7 +258,7 @@ pub const Table = struct {
     pub const Item = union(Kind) {
         track: *const api.Track,
         artist: *const api.Artist,
-        album: *const api.Album,
+        album: *const api.SimplifiedAlbum,
         playlist: *const api.Playlist,
     };
     pub const limit = 20;
@@ -311,14 +311,14 @@ pub const Table = struct {
     }
 
     fn fetchAlbumsArtist(self: *Table) !void {
-        const albums = try api.getArtistAlbums(self.client, self.query, limit, self.len());
+        const albums = try api.artists.getArtistAlbums(self.client, self.query, limit, self.len());
         try self.list.albums.appendSlice(self.allocator, albums.items);
         self.total = albums.total;
         self.has_next = albums.next != null;
     }
 
     fn fetchTracksPlaylist(self: *Table) !void {
-        const tracks = try api.getPlaylistTracks(self.client, self.query, limit, self.len());
+        const tracks = try api.playlists.getPlaylistTracks(self.client, self.query, limit, self.len());
         for (tracks.items) |item| {
             try self.list.tracks.append(self.allocator, item.track);
         }
@@ -428,7 +428,7 @@ pub const Table = struct {
                 };
 
                 while (true) {
-                    const tracks = try api.getAlbumTracks(
+                    const tracks = try api.albums.getAlbumTracks(
                         next_table.client,
                         album.id,
                         limit_max,
@@ -466,30 +466,30 @@ pub const Table = struct {
         switch (self.list) {
             .tracks => |list| {
                 const uris = [_][]const u8{list.items[self.selected].uri};
-                try api.startPlayback(self.client, .{ .uris = &uris }, device_id);
+                try api.player.startPlayback(self.client, .{ .uris = &uris }, device_id);
             },
             inline else => |list| {
                 const uri = list.items[self.selected].uri;
-                try api.startPlayback(self.client, .{ .context_uri = uri }, device_id);
+                try api.player.startPlayback(self.client, .{ .context_uri = uri }, device_id);
             },
         }
     }
 
     pub fn save(self: Table) !void {
         switch (self.list) {
-            .tracks => |list| try api.saveTracks(self.client, list.items[self.selected].id),
-            .artists => |list| try api.followArtists(self.client, list.items[self.selected].id),
-            .albums => |list| try api.saveAlbums(self.client, list.items[self.selected].id),
-            .playlists => |list| try api.followPlaylist(self.client, list.items[self.selected].id),
+            .tracks => |list| try api.tracks.saveTracks(self.client, list.items[self.selected].id),
+            .artists => |list| try api.users.followArtists(self.client, list.items[self.selected].id),
+            .albums => |list| try api.albums.saveAlbums(self.client, list.items[self.selected].id),
+            .playlists => |list| try api.users.followPlaylist(self.client, list.items[self.selected].id),
         }
     }
 
     pub fn remove(self: Table) !void {
         switch (self.list) {
-            .tracks => |list| try api.removeTracks(self.client, list.items[self.selected].id),
-            .artists => |list| try api.unfollowArtists(self.client, list.items[self.selected].id),
-            .albums => |list| try api.removeAlbums(self.client, list.items[self.selected].id),
-            .playlists => |list| try api.unfollowPlaylist(self.client, list.items[self.selected].id),
+            .tracks => |list| try api.tracks.removeTracks(self.client, list.items[self.selected].id),
+            .artists => |list| try api.users.unfollowArtists(self.client, list.items[self.selected].id),
+            .albums => |list| try api.albums.removeAlbums(self.client, list.items[self.selected].id),
+            .playlists => |list| try api.users.unfollowPlaylist(self.client, list.items[self.selected].id),
         }
     }
 
@@ -796,7 +796,7 @@ const drawArtists = makeDrawFn(
 );
 
 const drawAlbums = makeDrawFn(
-    api.Album,
+    api.SimplifiedAlbum,
     "Albums",
     &[_]Column{
         .{ .header_name = "Name", .field = .name, .size = 40 },
@@ -806,7 +806,7 @@ const drawAlbums = makeDrawFn(
     struct {
         fn writeField(
             comptime field: @Type(.enum_literal),
-            item: api.Album,
+            item: api.SimplifiedAlbum,
             writer: anytype,
         ) anyerror!void {
             switch (field) {

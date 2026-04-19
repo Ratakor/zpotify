@@ -1,4 +1,5 @@
 //! Based on https://github.com/zigtools/zls/blob/master/build.zig under MIT License.
+// we should probably be using lazyDependency but it doesn't seem to work
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -44,14 +45,20 @@ pub fn build(b: *std.Build) void {
     for (release_targets, &release_artifacts) |target_query, *artifact| {
         const release_target = b.resolveTargetQuery(target_query);
 
-        const axe_module = b.dependency("axe", .{
-            .target = target,
+        const lib_module = b.createModule(.{
+            .root_source_file = b.path("lib/api.zig"),
+            .target = release_target,
             .optimize = optimize,
-        }).module("axe");
-        const spoon_module = b.dependency("spoon", .{
-            .target = target,
+        });
+
+        const axe = b.dependency("axe", .{
+            .target = release_target,
             .optimize = optimize,
-        }).module("spoon");
+        });
+        const spoon = b.dependency("spoon", .{
+            .target = release_target,
+            .optimize = optimize,
+        });
 
         const exe_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
@@ -60,10 +67,12 @@ pub fn build(b: *std.Build) void {
             .single_threaded = single_threaded,
             .pic = pie,
             .strip = strip,
+            .omit_frame_pointer = strip,
             .imports = &.{
                 .{ .name = "build_options", .module = build_options },
-                .{ .name = "axe", .module = axe_module },
-                .{ .name = "spoon", .module = spoon_module },
+                .{ .name = "zpotify", .module = lib_module },
+                .{ .name = "axe", .module = axe.module("axe") },
+                .{ .name = "spoon", .module = spoon.module("spoon") },
             },
         });
 
@@ -82,14 +91,35 @@ pub fn build(b: *std.Build) void {
     }
     release(b, &release_artifacts, resolved_version);
 
-    const axe_module = b.dependency("axe", .{
+    const lib_module = b.addModule("zpotify", .{
+        .root_source_file = b.path("lib/api.zig"),
         .target = target,
         .optimize = optimize,
-    }).module("axe");
-    const spoon_module = b.dependency("spoon", .{
+        .single_threaded = single_threaded,
+        .pic = pie,
+        .strip = strip,
+        .omit_frame_pointer = strip,
+    });
+
+    // zig build lib
+    const lib = b.addLibrary(.{
+        .name = "zpotify",
+        .linkage = .static,
+        .root_module = lib_module,
+        .use_llvm = use_llvm,
+        .use_lld = use_llvm,
+    });
+    const lib_step = b.step("lib", "Build the library");
+    lib_step.dependOn(&b.addInstallArtifact(lib, .{}).step);
+
+    const axe = b.dependency("axe", .{
         .target = target,
         .optimize = optimize,
-    }).module("spoon");
+    });
+    const spoon = b.dependency("spoon", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     const exe_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -98,10 +128,12 @@ pub fn build(b: *std.Build) void {
         .single_threaded = single_threaded,
         .pic = pie,
         .strip = strip,
+        .omit_frame_pointer = strip,
         .imports = &.{
             .{ .name = "build_options", .module = build_options },
-            .{ .name = "axe", .module = axe_module },
-            .{ .name = "spoon", .module = spoon_module },
+            .{ .name = "zpotify", .module = lib_module },
+            .{ .name = "axe", .module = axe.module("axe") },
+            .{ .name = "spoon", .module = spoon.module("spoon") },
         },
     });
 

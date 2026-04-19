@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const help = @import("../cmd.zig").help;
 
 pub const description = "Play a track, playlist, album, or artist from your library";
@@ -24,7 +24,7 @@ const Query = enum {
         return switch (query) {
             .track => api.Track,
             .playlist => api.Playlist,
-            .album => api.SavedAlbum,
+            .album => api.Album,
             .artist => api.Artist,
         };
     }
@@ -34,7 +34,7 @@ const Query = enum {
             data: switch (query) {
                 .track => api.Tracks(.saved),
                 .playlist => api.Playlists,
-                .album => api.Albums(.saved),
+                .album => api.Albums,
                 .artist => api.Artists,
             },
             node: std.DoublyLinkedList.Node = .{},
@@ -57,7 +57,7 @@ pub fn exec(
         };
     } else {
         std.log.info("Resuming playback", .{});
-        try api.startPlayback(client, null, null);
+        try api.player.startPlayback(client, null, null);
         return;
     };
 
@@ -109,20 +109,20 @@ fn startPlayback(
     uri: []const u8,
 ) !void {
     if (query == .track) out: {
-        api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, null) catch |err| switch (err) {
+        api.player.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, null) catch |err| switch (err) {
             error.NoActiveDevice => break :out,
             else => return err,
         };
         return;
     } else out: {
-        api.startPlayback(client, .{ .context_uri = uri }, null) catch |err| switch (err) {
+        api.player.startPlayback(client, .{ .context_uri = uri }, null) catch |err| switch (err) {
             error.NoActiveDevice => break :out,
             else => return err,
         };
         return;
     }
 
-    const devices = try api.getDevices(client);
+    const devices = try api.player.getDevices(client);
     if (devices.len == 0) {
         std.log.err("No device found", .{});
         std.process.exit(1);
@@ -146,9 +146,9 @@ fn startPlayback(
     };
 
     if (query == .track) {
-        try api.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id);
+        try api.player.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id);
     } else {
-        try api.startPlayback(client, .{ .context_uri = uri }, id);
+        try api.player.startPlayback(client, .{ .context_uri = uri }, id);
     }
 }
 
@@ -165,10 +165,10 @@ fn getItemFromMenu(
     list.prepend(blk: {
         const node = try allocator.create(Node);
         node.* = .{ .data = try switch (query) {
-            .track => api.getUserTracks(client, limit, 0),
-            .playlist => api.getUserPlaylists(client, limit, 0),
-            .album => api.getUserAlbums(client, limit, 0),
-            .artist => api.getUserArtists(client, limit, null),
+            .track => api.tracks.getUserTracks(client, limit, 0),
+            .playlist => api.playlists.getCurrentUserPlaylists(client, limit, 0),
+            .album => api.albums.getUserAlbums(client, limit, 0),
+            .artist => api.users.getFollowedArtists(client, limit, null),
         } };
         break :blk &node.node;
     });
@@ -186,7 +186,7 @@ fn getItemFromMenu(
                 if (query == .artist) {
                     if (current_data.cursors.after) |after| {
                         const node = try allocator.create(Node);
-                        node.* = .{ .data = try api.getUserArtists(client, limit, after) };
+                        node.* = .{ .data = try api.users.getFollowedArtists(client, limit, after) };
                         list.insertAfter(current, &node.node);
                         break :blk &node.node;
                     }
@@ -195,9 +195,9 @@ fn getItemFromMenu(
                         const offset = current_data.offset + limit;
                         const node = try allocator.create(Node);
                         node.* = .{ .data = try switch (query) {
-                            .track => api.getUserTracks(client, limit, offset),
-                            .playlist => api.getUserPlaylists(client, limit, offset),
-                            .album => api.getUserAlbums(client, limit, offset),
+                            .track => api.tracks.getUserTracks(client, limit, offset),
+                            .playlist => api.playlists.getCurrentUserPlaylists(client, limit, offset),
+                            .album => api.albums.getUserAlbums(client, limit, offset),
                             .artist => unreachable,
                         } };
                         list.insertAfter(current, &node.node);

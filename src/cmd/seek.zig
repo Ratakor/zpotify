@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const help = @import("../cmd.zig").help;
 
 pub const description = "Get/Set the position of the current track";
@@ -60,9 +60,9 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
             parseInputAbsolute(buf);
         const ms = (time.min * std.time.ms_per_min) + (time.sec * std.time.ms_per_s);
         std.log.info("Seeking to {f}", .{time});
-        try api.seekToPosition(client, ms);
+        try api.player.seekToPosition(client, ms);
     } else {
-        const playback_state = try api.getPlaybackState(client);
+        const playback_state = try api.player.getPlaybackState(client);
 
         if (playback_state.item) |track| {
             const progress_ms = playback_state.progress_ms;
@@ -108,7 +108,7 @@ fn parseInputAbsolute(buf: []const u8) Time {
 
 fn parseInputRelative(client: *api.Client, buf: []const u8, sign: enum { pos, neg }) !Time {
     const progress: Time = blk: {
-        const playback_state = try api.getPlaybackState(client);
+        const playback_state = try api.player.getPlaybackState(client);
         const progress_ms = playback_state.progress_ms;
         const progress_min = progress_ms / std.time.ms_per_min;
         const progress_s = (progress_ms / std.time.ms_per_s) % std.time.s_per_min;

@@ -12,5 +12,11 @@
             .hash = "axe-0.7.0-M2JU5cyPAADJQcWDZE7xNmnuQtAgwmPLyCMjiLhOptrC",
         },
     },
-    .paths = .{""},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "lib",
+        "LICENSE",
+        "vendor",
+    },
 }
