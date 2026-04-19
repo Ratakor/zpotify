@@ -10,10 +10,12 @@ pub fn getPlaybackState(client: *Client) !api.PlaybackState {
 
 /// https://developer.spotify.com/documentation/web-api/reference/transfer-a-users-playback
 /// scopes: user-modify-playback-state
-// TODO: add `play` argument in body
 pub fn transferPlayback(client: *Client, device_id: []const u8) !void {
     var buf: [128]u8 = undefined;
-    const body = try std.fmt.bufPrint(&buf, "{{\"device_ids\":[\"{s}\"]}}", .{device_id});
+    const body = try std.fmt.bufPrint(&buf, "{f}", .{std.json.fmt(.{
+        .device_ids = &.{device_id},
+        .play = true, // ensure playback happens on new device
+    }, .{})});
     return client.sendRequest(void, .PUT, api.api_url ++ "/me/player", body);
 }
 
