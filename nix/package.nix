@@ -10,8 +10,7 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "zpotify";
-  # Must match the `version` in `build.zig.zon`.
-  version = "0.5.0-dev";
+  inherit (import ./version.nix lib) version;
 
   src = fs.toSource {
     root = ../.;
