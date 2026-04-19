@@ -86,13 +86,16 @@ pub fn init(
     const client_secret = try getClientData("Secret", allocator);
     defer allocator.free(client_secret);
 
-    const auth_code = try oauth2(redirect_uri, scopes, allocator, client_id);
+    const oauth2_result = try oauth2(redirect_uri, scopes, allocator, client_id);
+    const auth_code = oauth2_result.auth_code;
+    const code_verifier = oauth2_result.code_verifier;
     defer allocator.free(auth_code);
+    defer allocator.free(code_verifier);
 
     const basic_auth = blk: {
         var buf: [32 + 1 + 32]u8 = undefined;
         const source = try std.fmt.bufPrint(&buf, "{s}:{s}", .{ client_id, client_secret });
-        var base64 = std.base64.standard.Encoder;
+        var base64 = std.base64.url_safe_no_pad.Encoder;
         const size = base64.calcSize(source.len);
         const dest = try arena_allocator.alloc(u8, size);
         break :blk base64.encode(dest, source);
@@ -109,8 +112,9 @@ pub fn init(
     };
     const body = try std.fmt.allocPrint(
         allocator,
-        "grant_type=authorization_code&code={s}&redirect_uri=" ++ redirect_uri,
-        .{auth_code},
+        "client_id={s}&grant_type=authorization_code&code={s}&redirect_uri=" ++
+            redirect_uri ++ "&code_verifier={s}",
+        .{ client_id, auth_code, code_verifier },
     );
     defer allocator.free(body);
     client.refresh_token = (try client.getToken(body)).?;
@@ -309,12 +313,36 @@ fn getClientData(name: []const u8, allocator: std.mem.Allocator) ![]const u8 {
     return error.TooManyRetries;
 }
 
+// The PKCE authorization flow starts with the creation of a code verifier.
+// According to the PKCE standard, a code verifier is a high-entropy
+// cryptographic random string with a length between 43 and 128 characters
+// (the longer the better). It can contain letters, digits, underscores,
+// periods, hyphens, or tildes.
+fn generateRandomString(allocator: std.mem.Allocator) ![]const u8 {
+    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~";
+    var prng: std.Random.DefaultPrng = .init(@bitCast(std.time.microTimestamp()));
+    const rand = prng.random();
+
+    // that could be constant, like 64
+    const len = rand.intRangeAtMost(usize, 43, 128);
+    const buf = try allocator.alloc(u8, len);
+
+    for (buf) |*c| {
+        c.* = possible[rand.intRangeLessThan(usize, 0, possible.len)];
+    }
+
+    return buf;
+}
+
 fn oauth2(
     comptime redirect_uri: []const u8,
     comptime scopes: []const api.Scope,
     allocator: std.mem.Allocator,
     client_id: []const u8,
-) ![]const u8 {
+) !struct {
+    auth_code: []const u8,
+    code_verifier: []const u8,
+} {
     const scope = comptime blk: {
         var scopes_str: [scopes.len][]const u8 = undefined;
         for (scopes, &scopes_str) |scope, *scope_str| {
@@ -324,6 +352,14 @@ fn oauth2(
         var fba: std.heap.FixedBufferAllocator = .init(&fba_buffer);
         break :blk std.mem.join(fba.allocator(), "+", &scopes_str) catch unreachable;
     };
+
+    const code_verifier = try generateRandomString(allocator);
+    errdefer allocator.free(code_verifier);
+    var hashed: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(code_verifier, &hashed, .{});
+    const base64 = std.base64.url_safe_no_pad.Encoder;
+    var base64_buf: [base64.calcSize(hashed.len)]u8 = undefined;
+    const code_challenge = std.base64.url_safe_no_pad.Encoder.encode(&base64_buf, &hashed);
 
     // TODO: returns INVALID_CLIENT: Invalid client
     // const state = blk: {
@@ -340,9 +376,10 @@ fn oauth2(
     var buffer: [4096]u8 = undefined; // will be reutilized
     const url = try std.fmt.bufPrint(
         &buffer,
-        "https://accounts.spotify.com/authorize?client_id={s}&" ++ //state={s}&" ++
-            "response_type=code&redirect_uri=" ++ redirect_uri ++ "&scope=" ++ scope,
-        .{client_id},
+        "https://accounts.spotify.com/authorize?client_id={s}&" ++
+            "response_type=code&redirect_uri=" ++ redirect_uri ++ //state={s}&" ++
+            "&scope=" ++ scope ++ "&code_challenge_method=S256&code_challenge={s}",
+        .{ client_id, code_challenge },
     );
 
     const localhost = comptime blk: {
@@ -370,7 +407,10 @@ fn oauth2(
     const start = std.mem.indexOf(u8, response, "code=").? + "code=".len;
     const end = std.mem.indexOfScalar(u8, response[start..], ' ').? + start;
 
-    return allocator.dupe(u8, response[start..end]);
+    return .{
+        .code_verifier = code_verifier,
+        .auth_code = try allocator.dupe(u8, response[start..end]),
+    };
 }
 
 // most of this is basically std.http.Client.fetch + JSON parsing
