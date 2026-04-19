@@ -11,7 +11,7 @@ in
 stdenv.mkDerivation (finalAttrs: {
   pname = "zpotify";
   # Must match the `version` in `build.zig.zon`.
-  version = "0.4.0-dev";
+  version = "0.5.0-dev";
 
   src = fs.toSource {
     root = ../.;

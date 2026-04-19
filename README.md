@@ -43,12 +43,11 @@ Commands:
   repeat      Get/Set repeat mode
   shuffle     Toggle shuffle mode or force it to a specific state
   seek        Get/Set the position of the current track
-  volume      Get/Set volume or increase/decrease volume by 10%
+  volume      Get/Set volume
   like        Add the current track to your liked songs
   queue       Display tracks in the queue
   devices     List all available devices
   transfer    Transfer playback to another device
-  waybar      Display infos about the current playback for a waybar module
   logout      Remove the stored credentials from the config file
   completion  Generate shell completion script
   help        Display information about a command

@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 
 pub const description = "List all available devices";
 pub const usage =
@@ -10,7 +10,7 @@ pub const usage =
 ;
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    const devices = try api.getDevices(client);
+    const devices = try api.player.getDevices(client);
 
     if (devices.len == 0) {
         std.log.err("No device found", .{});

@@ -1,17 +1,18 @@
 const std = @import("std");
-const api = @import("../api.zig");
+const api = @import("zpotify");
 const help = @import("../cmd.zig").help;
 
-pub const description = "Get/Set volume or increase/decrease volume by 10%";
+pub const description = "Get/Set volume";
 pub const usage =
-    \\Usage: zpotify volume [0-100|up|down]
+    \\Usage: zpotify volume [[+/-]0-100]
     \\
-    \\Description: Get/Set volume or increase/decrease volume by 10%
+    \\Description: Get/Set volume
+    \\             Prepend +/- to relatively increase/decrease the volume
     \\
 ;
 
 pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    const playback_state = try api.getPlaybackState(client);
+    const playback_state = try api.player.getPlaybackState(client);
 
     var volume = blk: {
         if (playback_state.device) |device| {
@@ -27,32 +28,37 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
         }
     };
 
-    if (arg) |vol| {
-        if (std.mem.eql(u8, vol, "up")) {
-            volume += 10;
+    if (arg) |buf| {
+        if (buf[0] == '+') {
+            volume += parseVolume(buf[1..]);
             if (volume > 100) {
                 volume = 100;
             }
-        } else if (std.mem.eql(u8, vol, "down")) {
-            volume -|= 10;
+        } else if (buf[0] == '-') {
+            volume -|= parseVolume(buf[1..]);
         } else {
-            volume = std.fmt.parseUnsigned(u64, vol, 10) catch |err| {
-                std.log.err("Invalid volume: {}", .{err});
-                try help.exec("vol");
-                std.process.exit(1);
-            };
-            if (volume > 100) {
-                std.log.err("Volume must be between 0 and 100", .{});
-                try help.exec("vol");
-                std.process.exit(1);
-            }
+            volume = parseVolume(buf);
         }
         std.log.info("Setting volume to {d}%", .{volume});
-        try api.setVolume(client, volume);
+        try api.player.setVolume(client, volume);
     } else {
         std.log.info("Volume for {s} is set to {d}%", .{
             playback_state.device.?.name,
             volume,
         });
     }
+}
+
+fn parseVolume(buf: []const u8) u64 {
+    const volume = std.fmt.parseUnsigned(u64, buf, 10) catch |err| {
+        std.log.err("Invalid volume: {}", .{err});
+        help.exec("volume") catch {};
+        std.process.exit(1);
+    };
+    if (volume > 100) {
+        std.log.err("Volume must be between -100 and 100 inclusive", .{});
+        help.exec("volume") catch {};
+        std.process.exit(1);
+    }
+    return volume;
 }

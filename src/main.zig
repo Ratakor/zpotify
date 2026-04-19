@@ -1,7 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Client = @import("Client.zig");
+const api = @import("zpotify");
 const cmd = @import("cmd.zig");
+const save = @import("save.zig");
 
 pub const axe = @import("axe").Axe(.{
     .mutex = .{ .function = .progress_stderr },
@@ -28,6 +29,20 @@ pub const usage = blk: {
     break :blk str;
 };
 
+const redirect_uri = "http://127.0.0.1:9999/callback";
+const scopes = [_]api.Scope{
+    .user_read_currently_playing,
+    .user_read_playback_state,
+    .user_modify_playback_state,
+    .user_library_modify,
+    .user_library_read,
+    .user_follow_read,
+    .user_follow_modify,
+    .playlist_read_private,
+    .playlist_modify_public,
+    .playlist_modify_private,
+};
+
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
 
 pub fn main() !void {
@@ -49,6 +64,9 @@ pub fn main() !void {
     defer if (builtin.mode == .Debug) {
         _ = debug_allocator.deinit();
     };
+
+    var arena = std.heap.ArenaAllocator.init(raw_allocator);
+    defer arena.deinit();
 
     axe.init(allocator, null, null) catch unreachable;
     defer axe.deinit(allocator);
@@ -74,7 +92,9 @@ pub fn main() !void {
         return cmd.completion.exec(args.next());
     }
 
-    var client = try Client.init(allocator, raw_allocator);
+    const save_path = try save.getPath(allocator);
+    defer allocator.free(save_path);
+    var client = try api.Client.init(redirect_uri, &scopes, allocator, &arena, save_path);
     defer client.deinit();
 
     if (std.mem.eql(u8, command, "print")) {
@@ -103,10 +123,12 @@ pub fn main() !void {
         return cmd.devices.exec(&client, args.next());
     } else if (std.mem.eql(u8, command, "transfer")) {
         return cmd.transfer.exec(&client, args.next());
-    } else if (std.mem.eql(u8, command, "waybar")) {
-        return cmd.waybar.exec(&client, raw_allocator);
     } else {
         try cmd.help.exec(command);
         std.process.exit(1);
     }
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }
