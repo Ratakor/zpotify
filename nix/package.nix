@@ -28,9 +28,6 @@ stdenv.mkDerivation (finalAttrs: {
     zig
   ];
 
-  dontInstall = true;
-  doCheck = true;
-
   configurePhase = ''
     export ZIG_GLOBAL_CACHE_DIR=$TEMP/.cache
     PACKAGE_DIR=${callPackage ./deps.nix { }}
@@ -41,10 +38,10 @@ stdenv.mkDerivation (finalAttrs: {
       --system $PACKAGE_DIR \
       --release=${releaseMode} \
       -Dversion-string=${finalAttrs.version} \
-      --color off \
-      --prefix $out
+      --color off
   '';
 
+  doCheck = true;
   checkPhase = ''
     zig build test \
       --system $PACKAGE_DIR \
