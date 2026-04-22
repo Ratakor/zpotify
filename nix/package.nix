@@ -1,6 +1,6 @@
 {
   lib,
-  stdenv,
+  stdenvNoCC,
   callPackage,
   installShellFiles,
   zig,
@@ -9,7 +9,7 @@
 let
   fs = lib.fileset;
 in
-stdenv.mkDerivation (finalAttrs: {
+stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "zpotify";
   inherit (import ./version.nix lib) version;
 
@@ -38,7 +38,8 @@ stdenv.mkDerivation (finalAttrs: {
       --system $PACKAGE_DIR \
       --release=${releaseMode} \
       -Dversion-string=${finalAttrs.version} \
-      --color off
+      --color off \
+      --prefix $out
   '';
 
   doCheck = true;
@@ -49,7 +50,8 @@ stdenv.mkDerivation (finalAttrs: {
       --color off
   '';
 
-  postInstall = ''
+  dontInstall = true;
+  postBuild = ''
     installShellCompletion --cmd zpotify \
       --bash <($out/bin/zpotify completion bash) \
       --zsh <($out/bin/zpotify completion zsh)
