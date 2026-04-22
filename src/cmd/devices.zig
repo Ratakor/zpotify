@@ -21,6 +21,7 @@ pub fn exec(ctx: *cmd.Context) !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(ctx.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
+    defer stdout.flush() catch {};
 
     if (ctx.args.next()) |arg| {
         // used on auto-completion for `transfer`
@@ -28,7 +29,6 @@ pub fn exec(ctx: *cmd.Context) !void {
             for (devices) |device| {
                 try stdout.print("'{s}' ", .{device.name});
             }
-            try stdout.flush();
             return;
         }
     }
@@ -45,5 +45,4 @@ pub fn exec(ctx: *cmd.Context) !void {
         }
         try stdout.print("Active: {}\n", .{device.is_active});
     }
-    try stdout.flush();
 }

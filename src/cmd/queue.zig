@@ -27,6 +27,7 @@ pub fn exec(ctx: *cmd.Context) !void {
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(ctx.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
+    defer stdout.flush() catch {};
 
     if (queue.currently_playing) |track| {
         try stdout.writeAll("Currently playing: ");
@@ -35,7 +36,6 @@ pub fn exec(ctx: *cmd.Context) !void {
 
     if (queue.queue.len == 0) {
         try stdout.writeAll("Queue is empty\n");
-        try stdout.flush();
         return;
     }
 
@@ -44,6 +44,4 @@ pub fn exec(ctx: *cmd.Context) !void {
         try stdout.print("  Track {d}: ", .{i});
         try printTrack(stdout, track);
     }
-
-    try stdout.flush();
 }

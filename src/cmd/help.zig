@@ -14,6 +14,7 @@ pub fn exec(ctx: *cmd.Context, command: ?[]const u8) !void {
     var buffer: [4096]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(ctx.io, &buffer);
     const stderr = &stderr_writer.interface;
+    defer stderr.flush() catch {};
     if (command) |com| {
         inline for (comptime std.meta.declarations(cmd)) |decl| {
             comptime if (std.mem.eql(u8, decl.name, "Context")) continue;
@@ -31,5 +32,4 @@ pub fn exec(ctx: *cmd.Context, command: ?[]const u8) !void {
     } else {
         try stderr.writeAll(main.usage);
     }
-    try stderr.flush();
 }
