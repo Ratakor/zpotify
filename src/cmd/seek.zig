@@ -1,6 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const help = @import("../cmd.zig").help;
+const cmd = @import("../cmd.zig");
+const help = cmd.help;
 
 pub const description = "Get/Set the position of the current track";
 pub const usage =
@@ -50,19 +51,19 @@ const Time = struct {
     }
 };
 
-pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    if (arg) |buf| {
+pub fn exec(ctx: *cmd.Context) !void {
+    if (ctx.args.next()) |buf| {
         const time = if (buf[0] == '+')
-            try parseInputRelative(client, buf[1..], .pos)
+            try parseInputRelative(ctx, buf[1..], .pos)
         else if (buf[0] == '-')
-            try parseInputRelative(client, buf[1..], .neg)
+            try parseInputRelative(ctx, buf[1..], .neg)
         else
-            parseInputAbsolute(buf);
+            parseInputAbsolute(ctx, buf);
         const ms = (time.min * std.time.ms_per_min) + (time.sec * std.time.ms_per_s);
         std.log.info("Seeking to {f}", .{time});
-        try api.player.seekToPosition(client, ms);
+        try api.player.seekToPosition(ctx.client, ms);
     } else {
-        const playback_state = try api.player.getPlaybackState(client);
+        const playback_state = try api.player.getPlaybackState(ctx.client);
 
         if (playback_state.item) |track| {
             const progress_ms = playback_state.progress_ms;
@@ -84,21 +85,21 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     }
 }
 
-fn parseUnsigned(buf: []const u8) u32 {
+fn parseUnsigned(ctx: *cmd.Context, buf: []const u8) u32 {
     return std.fmt.parseUnsigned(u32, buf, 10) catch |err| {
         std.log.err("Invalid time format: {}", .{err});
-        help.exec("seek") catch {};
+        help.exec(ctx, "seek") catch {};
         std.process.exit(1);
     };
 }
 
-fn parseInputAbsolute(buf: []const u8) Time {
+fn parseInputAbsolute(ctx: *cmd.Context, buf: []const u8) Time {
     var min, var sec = blk: {
         const sep = std.mem.indexOfScalar(u8, buf, ':') orelse {
-            break :blk .{ 0, parseUnsigned(buf) };
+            break :blk .{ 0, parseUnsigned(ctx, buf) };
         };
-        const min = parseUnsigned(buf[0..sep]);
-        const sec = parseUnsigned(buf[sep + 1 ..]);
+        const min = parseUnsigned(ctx, buf[0..sep]);
+        const sec = parseUnsigned(ctx, buf[sep + 1 ..]);
         break :blk .{ min, sec };
     };
     min += sec / std.time.s_per_min;
@@ -106,15 +107,15 @@ fn parseInputAbsolute(buf: []const u8) Time {
     return .{ .min = min, .sec = sec };
 }
 
-fn parseInputRelative(client: *api.Client, buf: []const u8, sign: enum { pos, neg }) !Time {
+fn parseInputRelative(ctx: *cmd.Context, buf: []const u8, sign: enum { pos, neg }) !Time {
     const progress: Time = blk: {
-        const playback_state = try api.player.getPlaybackState(client);
+        const playback_state = try api.player.getPlaybackState(ctx.client);
         const progress_ms = playback_state.progress_ms;
         const progress_min = progress_ms / std.time.ms_per_min;
         const progress_s = (progress_ms / std.time.ms_per_s) % std.time.s_per_min;
         break :blk .{ .min = @intCast(progress_min), .sec = @intCast(progress_s) };
     };
-    const diff = parseInputAbsolute(buf);
+    const diff = parseInputAbsolute(ctx, buf);
 
     return switch (sign) {
         .pos => progress.add(diff),

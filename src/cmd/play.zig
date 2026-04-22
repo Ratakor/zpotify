@@ -1,6 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const help = @import("../cmd.zig").help;
+const cmd = @import("../cmd.zig");
+const help = cmd.help;
 
 pub const description = "Play a track, playlist, album, or artist from your library";
 pub const usage =
@@ -44,34 +45,28 @@ const Query = enum {
 
 var dmenu_cmd: []const u8 = undefined;
 
-pub fn exec(
-    client: *api.Client,
-    child_allocator: std.mem.Allocator,
-    arg: ?[]const u8,
-) !void {
-    const query = if (arg) |value| blk: {
+pub fn exec(ctx: *cmd.Context) !void {
+    const query = if (ctx.args.next()) |value| blk: {
         break :blk std.meta.stringToEnum(Query, value) orelse {
             std.log.err("Invalid query type: '{s}'", .{value});
-            try help.exec("play");
+            try help.exec(ctx, "play");
             std.process.exit(1);
         };
     } else {
         std.log.info("Resuming playback", .{});
-        try api.player.startPlayback(client, null, null);
+        try api.player.startPlayback(ctx.client, null, null);
         return;
     };
 
-    var arena = std.heap.ArenaAllocator.init(child_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    const allocator = ctx.arena.allocator();
 
     // Checking $DMENU for backward compatibility
-    dmenu_cmd = std.posix.getenv("ZPOTIFY_DMENU") orelse std.posix.getenv("DMENU") orelse "dmenu -i";
+    dmenu_cmd = ctx.env_map.get("ZPOTIFY_DMENU") orelse ctx.env_map.get("DMENU") orelse "dmenu -i";
 
     switch (query) {
         .track => {
-            const track = try getItemFromMenu(.track, client, allocator);
-            try startPlayback(.track, client, allocator, track.uri);
+            const track = try getItemFromMenu(.track, ctx, allocator);
+            try startPlayback(.track, ctx, allocator, track.uri);
             std.log.info("Playing track '{s}' from '{s}' by {s}", .{
                 track.name,
                 track.album.name,
@@ -79,24 +74,24 @@ pub fn exec(
             });
         },
         .playlist => {
-            const playlist = try getItemFromMenu(.playlist, client, allocator);
-            try startPlayback(.playlist, client, allocator, playlist.uri);
+            const playlist = try getItemFromMenu(.playlist, ctx, allocator);
+            try startPlayback(.playlist, ctx, allocator, playlist.uri);
             std.log.info("Playing playlist '{s}' by {s}", .{
                 playlist.name,
                 playlist.owner.display_name orelse playlist.owner.id,
             });
         },
         .album => {
-            const album = try getItemFromMenu(.album, client, allocator);
-            try startPlayback(.album, client, allocator, album.uri);
+            const album = try getItemFromMenu(.album, ctx, allocator);
+            try startPlayback(.album, ctx, allocator, album.uri);
             std.log.info("Playing album '{s}' by {s}", .{
                 album.name,
                 album.artists[0].name,
             });
         },
         .artist => {
-            const artist = try getItemFromMenu(.artist, client, allocator);
-            try startPlayback(.artist, client, allocator, artist.uri);
+            const artist = try getItemFromMenu(.artist, ctx, allocator);
+            try startPlayback(.artist, ctx, allocator, artist.uri);
             std.log.info("Playing popular songs by {s}", .{artist.name});
         },
     }
@@ -104,25 +99,25 @@ pub fn exec(
 
 fn startPlayback(
     query: Query,
-    client: *api.Client,
-    allocator: std.mem.Allocator,
+    ctx: *cmd.Context,
+    allocator: std.mem.Allocator, // arena allocator
     uri: []const u8,
 ) !void {
     if (query == .track) out: {
-        api.player.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, null) catch |err| switch (err) {
+        api.player.startPlayback(ctx.client, .{ .uris = &.{uri} }, null) catch |err| switch (err) {
             error.NoActiveDevice => break :out,
             else => return err,
         };
         return;
     } else out: {
-        api.player.startPlayback(client, .{ .context_uri = uri }, null) catch |err| switch (err) {
+        api.player.startPlayback(ctx.client, .{ .context_uri = uri }, null) catch |err| switch (err) {
             error.NoActiveDevice => break :out,
             else => return err,
         };
         return;
     }
 
-    const devices = try api.player.getDevices(client);
+    const devices = try api.player.getDevices(ctx.client);
     if (devices.len == 0) {
         std.log.err("No device found", .{});
         std.process.exit(1);
@@ -133,7 +128,7 @@ fn startPlayback(
             break :blk devices[0].id.?;
         }
 
-        const result = try spawnMenu(allocator, dmenu_cmd, devices);
+        const result = try spawnMenu(ctx, dmenu_cmd, devices);
         defer allocator.free(result);
 
         for (devices) |device| {
@@ -146,16 +141,16 @@ fn startPlayback(
     };
 
     if (query == .track) {
-        try api.player.startPlayback(client, .{ .uris = &[_][]const u8{uri} }, id);
+        try api.player.startPlayback(ctx.client, .{ .uris = &.{uri} }, id);
     } else {
-        try api.player.startPlayback(client, .{ .context_uri = uri }, id);
+        try api.player.startPlayback(ctx.client, .{ .context_uri = uri }, id);
     }
 }
 
 // this is what zig's polymorphism does to a mf
 fn getItemFromMenu(
     comptime query: Query,
-    client: *api.Client,
+    ctx: *cmd.Context,
     allocator: std.mem.Allocator, // arena allocator
 ) !query.Type() {
     const Node = query.NodeType();
@@ -165,10 +160,10 @@ fn getItemFromMenu(
     list.prepend(blk: {
         const node = try allocator.create(Node);
         node.* = .{ .data = try switch (query) {
-            .track => api.tracks.getUserTracks(client, limit, 0),
-            .playlist => api.playlists.getCurrentUserPlaylists(client, limit, 0),
-            .album => api.albums.getUserAlbums(client, limit, 0),
-            .artist => api.users.getFollowedArtists(client, limit, null),
+            .track => api.tracks.getUserTracks(ctx.client, limit, 0),
+            .playlist => api.playlists.getCurrentUserPlaylists(ctx.client, limit, 0),
+            .album => api.albums.getUserAlbums(ctx.client, limit, 0),
+            .artist => api.users.getFollowedArtists(ctx.client, limit, null),
         } };
         break :blk &node.node;
     });
@@ -176,7 +171,7 @@ fn getItemFromMenu(
 
     while (true) {
         const current_data = @as(*Node, @fieldParentPtr("node", current)).data;
-        const result = try spawnMenu(allocator, dmenu_cmd, current_data.items);
+        const result = try spawnMenu(ctx, dmenu_cmd, current_data.items);
         defer allocator.free(result);
 
         if (std.mem.eql(u8, "previous", result)) {
@@ -186,7 +181,7 @@ fn getItemFromMenu(
                 if (query == .artist) {
                     if (current_data.cursors.after) |after| {
                         const node = try allocator.create(Node);
-                        node.* = .{ .data = try api.users.getFollowedArtists(client, limit, after) };
+                        node.* = .{ .data = try api.users.getFollowedArtists(ctx.client, limit, after) };
                         list.insertAfter(current, &node.node);
                         break :blk &node.node;
                     }
@@ -195,9 +190,9 @@ fn getItemFromMenu(
                         const offset = current_data.offset + limit;
                         const node = try allocator.create(Node);
                         node.* = .{ .data = try switch (query) {
-                            .track => api.tracks.getUserTracks(client, limit, offset),
-                            .playlist => api.playlists.getCurrentUserPlaylists(client, limit, offset),
-                            .album => api.albums.getUserAlbums(client, limit, offset),
+                            .track => api.tracks.getUserTracks(ctx.client, limit, offset),
+                            .playlist => api.playlists.getCurrentUserPlaylists(ctx.client, limit, offset),
+                            .album => api.albums.getUserAlbums(ctx.client, limit, offset),
                             .artist => unreachable,
                         } };
                         list.insertAfter(current, &node.node);
@@ -234,7 +229,7 @@ fn getItemFromMenu(
     }
 }
 
-fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]const u8 {
+fn spawnMenu(ctx: *cmd.Context, command: []const u8, items: anytype) ![]const u8 {
     const T, const nullable = blk: {
         const T = @typeInfo(@TypeOf(items)).pointer.child;
         const ti = @typeInfo(T);
@@ -247,27 +242,13 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
     // buffer used for writing to the child process then reading from it
     var common_buffer: [4096]u8 = undefined;
 
-    // pipe[0] = read, pipe[1] = write
-    const p2c_pipe = try std.posix.pipe(); // parent -> child
-    const c2p_pipe = try std.posix.pipe(); // child -> parent
+    var child = try std.process.spawn(ctx.io, .{
+        .argv = &.{ "sh", "-c", command },
+        .stdout = .pipe,
+        .stdin = .pipe,
+    });
 
-    const fork_pid = try std.posix.fork();
-    if (fork_pid == 0) {
-        std.posix.close(p2c_pipe[1]);
-        std.posix.close(c2p_pipe[0]);
-
-        try std.posix.dup2(p2c_pipe[0], std.posix.STDIN_FILENO);
-        std.posix.close(p2c_pipe[0]);
-        try std.posix.dup2(c2p_pipe[1], std.posix.STDOUT_FILENO);
-        std.posix.close(c2p_pipe[1]);
-
-        std.process.execv(allocator, &[_][]const u8{ "sh", "-c", cmd }) catch unreachable;
-    }
-
-    std.posix.close(p2c_pipe[0]);
-    std.posix.close(c2p_pipe[1]);
-
-    var p2c_writer = std.fs.File.writer(.{ .handle = p2c_pipe[1] }, &common_buffer);
+    var p2c_writer = child.stdin.?.writer(ctx.io, &common_buffer);
     const writer = &p2c_writer.interface;
     for (items) |item| {
         if (@hasField(T, "track")) {
@@ -286,23 +267,21 @@ fn spawnMenu(allocator: std.mem.Allocator, cmd: []const u8, items: anytype) ![]c
         try writer.writeAll("previous\nnext");
     }
     try writer.flush();
-    std.posix.close(p2c_pipe[1]);
+    child.stdin.?.close(ctx.io);
 
-    const wpr = std.posix.waitpid(fork_pid, 0);
-    if (std.posix.W.EXITSTATUS(wpr.status) != 0) {
-        std.posix.close(c2p_pipe[0]);
-        std.process.exit(1);
+    switch (try child.wait(ctx.io)) {
+        .exited => |status| if (status != 0) std.process.exit(1),
+        else => std.process.exit(1),
     }
 
-    var c2p_reader = std.fs.File.reader(.{ .handle = c2p_pipe[0] }, &common_buffer);
+    var c2p_reader = child.stdout.?.reader(ctx.io, &common_buffer);
     const item = try c2p_reader.interface.takeDelimiterExclusive('\n');
-    std.posix.close(c2p_pipe[0]);
+    child.stdout.?.close(ctx.io);
 
     if (@hasField(T, "track") or @hasField(T, "album")) {
         if (std.mem.indexOfScalar(u8, item, '-')) |i| {
-            return allocator.dupe(u8, item[i + 2 ..]);
+            return ctx.allocator.dupe(u8, item[i + 2 ..]);
         }
     }
-
-    return allocator.dupe(u8, item);
+    return ctx.allocator.dupe(u8, item);
 }

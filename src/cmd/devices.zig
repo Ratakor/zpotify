@@ -1,5 +1,6 @@
 const std = @import("std");
 const api = @import("zpotify");
+const cmd = @import("../cmd.zig");
 
 pub const description = "List all available devices";
 pub const usage =
@@ -9,8 +10,8 @@ pub const usage =
     \\
 ;
 
-pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
-    const devices = try api.player.getDevices(client);
+pub fn exec(ctx: *cmd.Context) !void {
+    const devices = try api.player.getDevices(ctx.client);
 
     if (devices.len == 0) {
         std.log.err("No device found", .{});
@@ -18,12 +19,12 @@ pub fn exec(client: *api.Client, arg: ?[]const u8) !void {
     }
 
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(ctx.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    if (arg) |a| {
+    if (ctx.args.next()) |arg| {
         // used on auto-completion for `transfer`
-        if (std.mem.eql(u8, a, "_name")) {
+        if (std.mem.eql(u8, arg, "_name")) {
             for (devices) |device| {
                 try stdout.print("'{s}' ", .{device.name});
             }

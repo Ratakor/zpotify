@@ -4,6 +4,9 @@
 // - src/cmd/completion.zig (if needing specific completion)
 // - README.md (Usage)
 
+const std = @import("std");
+const api = @import("zpotify");
+
 pub const print = @import("cmd/print.zig");
 pub const play = @import("cmd/play.zig");
 pub const pause = @import("cmd/pause.zig");
@@ -21,3 +24,12 @@ pub const logout = @import("cmd/logout.zig");
 pub const completion = @import("cmd/completion.zig");
 pub const help = @import("cmd/help.zig");
 pub const version = @import("cmd/version.zig");
+
+pub const Context = struct {
+    io: std.Io,
+    allocator: std.mem.Allocator,
+    arena: *std.heap.ArenaAllocator,
+    env_map: *std.process.Environ.Map,
+    args: std.process.Args.Iterator,
+    client: *api.Client,
+};

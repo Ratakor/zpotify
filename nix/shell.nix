@@ -3,6 +3,7 @@
   zig,
   zls,
   jq,
+  zon2nix,
   gnutar,
   xz,
   p7zip,
@@ -12,6 +13,7 @@ mkShellNoCC {
     zig
     zls
     jq
+    zon2nix
 
     # `zig build release` dependencies
     gnutar

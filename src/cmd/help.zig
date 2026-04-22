@@ -10,11 +10,13 @@ pub const usage =
     \\
 ;
 
-pub fn exec(command: ?[]const u8) !void {
-    var stderr_writer = std.fs.File.stderr().writer(&.{});
+pub fn exec(ctx: *cmd.Context, command: ?[]const u8) !void {
+    var buffer: [4096]u8 = undefined;
+    var stderr_writer = std.Io.File.stderr().writer(ctx.io, &buffer);
     const stderr = &stderr_writer.interface;
     if (command) |com| {
         inline for (comptime std.meta.declarations(cmd)) |decl| {
+            comptime if (std.mem.eql(u8, decl.name, "Context")) continue;
             if (std.mem.eql(u8, com, decl.name)) {
                 try stderr.writeAll(@field(cmd, decl.name).usage);
                 return;
@@ -29,4 +31,5 @@ pub fn exec(command: ?[]const u8) !void {
     } else {
         try stderr.writeAll(main.usage);
     }
+    try stderr.flush();
 }

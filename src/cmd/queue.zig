@@ -1,5 +1,6 @@
 const std = @import("std");
 const api = @import("zpotify");
+const cmd = @import("../cmd.zig");
 
 pub const description = "Display tracks in the queue";
 pub const usage =
@@ -20,11 +21,11 @@ fn printTrack(writer: *std.Io.Writer, track: api.Track) !void {
     try writer.writeAll("\n");
 }
 
-pub fn exec(client: *api.Client) !void {
-    const queue = try api.player.getQueue(client);
+pub fn exec(ctx: *cmd.Context) !void {
+    const queue = try api.player.getQueue(ctx.client);
 
     var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(ctx.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
     if (queue.currently_playing) |track| {

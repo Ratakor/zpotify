@@ -1,12 +1,21 @@
 .{
     .name = .zpotify,
+    // Remove `-dev` when tagging a new release and add it back on the next development cycle.
     .version = "0.5.0-dev",
     .fingerprint = 0x7c117f9b8cb9acba,
-    .minimum_zig_version = "0.15.2",
+    // Must be kept in sync with `flake.lock` via the following command:
+    // ```
+    // nix flake update
+    // ```
+    .minimum_zig_version = "0.16.0",
+    // Must be kept in sync with `nix/deps.nix` via the following command:
+    // ```
+    // zon2nix > nix/deps.nix
+    // ```
     .dependencies = .{
         .axe = .{
-            .url = "git+https://github.com/Ratakor/axe#4df48b5fd1bd8496dc3a9ed49790649b7c4e8fee",
-            .hash = "axe-0.7.0-M2JU5cyPAADJQcWDZE7xNmnuQtAgwmPLyCMjiLhOptrC",
+            .url = "git+https://github.com/Ratakor/axe#186078c497e4e4dab20926c1b135fa9ab8a6a3b1",
+            .hash = "axe-0.8.0-M2JU5SuRAABRUbICFInh_GltUm46JBd986HQCE7j6BJz",
         },
     },
     .paths = .{
@@ -14,6 +23,5 @@
         "build.zig.zon",
         "lib",
         "LICENSE",
-        "vendor",
     },
 }

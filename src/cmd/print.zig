@@ -1,6 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const help = @import("../cmd.zig").help;
+const cmd = @import("../cmd.zig");
+const help = cmd.help;
 
 pub const description = "Display current track info in a specific format";
 // format options must be kept in sync with completion.zig
@@ -48,27 +49,27 @@ const default_format =
     \\
 ;
 
-pub fn exec(client: *api.Client, args: *std.process.ArgIterator) !void {
-    const playback_state = try api.player.getPlaybackState(client);
+pub fn exec(ctx: *cmd.Context) !void {
+    const playback_state = try api.player.getPlaybackState(ctx.client);
 
     var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(ctx.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    if (args.next()) |arg2| {
-        try format(stdout, arg2, playback_state);
-        while (args.next()) |arg| {
+    if (ctx.args.next()) |arg2| {
+        try format(ctx, stdout, arg2, playback_state);
+        while (ctx.args.next()) |arg| {
             try stdout.writeAll(" ");
-            try format(stdout, arg, playback_state);
+            try format(ctx, stdout, arg, playback_state);
         }
     } else {
-        try format(stdout, default_format, playback_state);
+        try format(ctx, stdout, default_format, playback_state);
     }
 
     try stdout.flush();
 }
 
-fn format(writer: *std.Io.Writer, fmt: []const u8, info: api.PlaybackState) !void {
+fn format(ctx: *cmd.Context, writer: *std.Io.Writer, fmt: []const u8, info: api.PlaybackState) !void {
     var i: usize = 0;
     while (i < fmt.len) : (i += 1) {
         switch (fmt[i]) {
@@ -84,7 +85,7 @@ fn format(writer: *std.Io.Writer, fmt: []const u8, info: api.PlaybackState) !voi
 
                 // no check for { in arg because I don't care
                 const arg = fmt[fmt_begin..fmt_end];
-                try handleFormatArg(writer, arg, info);
+                try handleFormatArg(ctx, writer, arg, info);
             },
             '}' => {
                 std.log.err("Missing opening {{", .{});
@@ -145,7 +146,7 @@ fn hexToInt(c: u8) u8 {
     };
 }
 
-fn handleFormatArg(writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackState) !void {
+fn handleFormatArg(ctx: *cmd.Context, writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackState) !void {
     if (std.mem.eql(u8, arg, "title")) {
         if (info.item) |track| {
             try writer.print("{s}", .{track.name});
@@ -159,7 +160,7 @@ fn handleFormatArg(writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackSt
             };
             const start_pause = (std.mem.indexOfScalar(u8, arg[start_play..], '/') orelse {
                 std.log.err("Invalid state format: {s}", .{arg});
-                try help.exec("print");
+                try help.exec(ctx, "print");
                 std.process.exit(1);
             }) + start_play;
             break :blk .{ arg[start_play + 1 .. start_pause], arg[start_pause + 1 ..] };
@@ -274,7 +275,7 @@ fn handleFormatArg(writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackSt
         try writer.writeAll("null");
     } else {
         std.log.err("Unknown format argument: {s}", .{arg});
-        try help.exec("print");
+        try help.exec(ctx, "print");
         std.process.exit(1);
     }
 }

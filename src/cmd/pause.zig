@@ -1,5 +1,6 @@
 const std = @import("std");
 const api = @import("zpotify");
+const cmd = @import("../cmd.zig");
 
 pub const description = "Toggle pause state";
 pub const usage =
@@ -9,14 +10,14 @@ pub const usage =
     \\
 ;
 
-pub fn exec(client: *api.Client) !void {
-    const playback_state = try api.player.getPlaybackState(client);
+pub fn exec(ctx: *cmd.Context) !void {
+    const playback_state = try api.player.getPlaybackState(ctx.client);
 
     if (playback_state.is_playing) {
         std.log.info("Pausing playback", .{});
-        try api.player.pausePlayback(client);
+        try api.player.pausePlayback(ctx.client);
     } else {
         std.log.info("Resuming playback", .{});
-        try api.player.startPlayback(client, null, null);
+        try api.player.startPlayback(ctx.client, null, null);
     }
 }

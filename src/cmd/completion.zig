@@ -23,21 +23,22 @@ const Shell = enum {
     }
 };
 
-pub fn exec(optional_shell: ?[]const u8) !void {
-    const shell_str = optional_shell orelse {
-        try cmd.help.exec("completion");
+pub fn exec(ctx: *cmd.Context) !void {
+    const shell_str = ctx.args.next() orelse {
+        try cmd.help.exec(ctx, "completion");
         std.process.exit(1);
     };
 
     const shell = std.meta.stringToEnum(Shell, shell_str) orelse {
         std.log.err("Unsupported shell: {s}", .{shell_str});
-        try cmd.help.exec("completion");
+        try cmd.help.exec(ctx, "completion");
         std.process.exit(1);
     };
 
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.Io.File.stdout().writer(ctx.io, &.{});
     const stdout = &stdout_writer.interface;
     try stdout.writeAll(shell.completion());
+    try stdout.flush();
 }
 
 // TODO!
@@ -71,6 +72,7 @@ const zsh_completion = blk: {
         \\        main_commands=('
     ;
     for (decls) |decl| {
+        if (std.mem.eql(u8, decl.name, "Context")) continue;
         str = str ++ (decl.name ++ "\\:\"" ++ @field(cmd, decl.name).description ++ "\" ");
     }
     str = str ++ "')\n" ++

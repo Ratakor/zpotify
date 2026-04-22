@@ -4,9 +4,7 @@ const api = @import("zpotify");
 const cmd = @import("cmd.zig");
 const save = @import("save.zig");
 
-pub const axe = @import("axe").Axe(.{
-    .mutex = .{ .function = .progress_stderr },
-});
+pub const axe = @import("axe").Axe(.{});
 
 pub const std_options: std.Options = .{
     .log_level = if (builtin.mode == .Debug) .debug else .info,
@@ -21,6 +19,7 @@ pub const usage = blk: {
         \\
     ;
     for (std.meta.declarations(cmd)) |decl| {
+        if (std.mem.eql(u8, decl.name, "Context")) continue;
         str = str ++ std.fmt.comptimePrint("  {s: <10}  {s}\n", .{
             decl.name,
             @field(cmd, decl.name).description,
@@ -43,38 +42,22 @@ const scopes = [_]api.Scope{
     .playlist_modify_private,
 };
 
-var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-
-pub fn main() !void {
-    const allocator = if (builtin.mode == .Debug)
-        debug_allocator.allocator()
-    else if (builtin.link_libc)
-        std.heap.c_allocator
-    else
-        std.heap.smp_allocator;
-
-    // allocator used with ArenaAllocator
-    const raw_allocator = if (builtin.mode == .Debug)
-        allocator
-    else if (builtin.link_libc)
-        std.heap.raw_c_allocator
-    else
-        std.heap.page_allocator;
-
-    defer if (builtin.mode == .Debug) {
-        _ = debug_allocator.deinit();
+pub fn main(init: std.process.Init) !void {
+    var ctx: cmd.Context = .{
+        .io = init.io,
+        .allocator = init.gpa,
+        .arena = init.arena,
+        .env_map = init.environ_map,
+        .args = init.minimal.args.iterate(),
+        .client = undefined,
     };
 
-    var arena = std.heap.ArenaAllocator.init(raw_allocator);
-    defer arena.deinit();
+    try axe.init(ctx.io, null, ctx.env_map);
+    defer axe.deinit();
 
-    axe.init(allocator, null, null) catch unreachable;
-    defer axe.deinit(allocator);
-
-    var args = std.process.args();
-    std.debug.assert(args.skip());
-    var command = args.next() orelse {
-        try cmd.help.exec(null);
+    std.debug.assert(ctx.args.skip());
+    var command = ctx.args.next() orelse {
+        try cmd.help.exec(&ctx, null);
         std.process.exit(1);
     };
 
@@ -83,48 +66,56 @@ pub fn main() !void {
     }
 
     if (std.mem.eql(u8, command, "logout")) {
-        return cmd.logout.exec(allocator);
+        return cmd.logout.exec(&ctx);
     } else if (std.mem.eql(u8, command, "help")) {
-        return cmd.help.exec(args.next());
+        return cmd.help.exec(&ctx, ctx.args.next());
     } else if (std.mem.eql(u8, command, "version")) {
-        return cmd.version.exec();
+        return cmd.version.exec(&ctx);
     } else if (std.mem.eql(u8, command, "completion")) {
-        return cmd.completion.exec(args.next());
+        return cmd.completion.exec(&ctx);
     }
 
-    const save_path = try save.getPath(allocator);
-    defer allocator.free(save_path);
-    var client = try api.Client.init(redirect_uri, &scopes, allocator, &arena, save_path);
+    const save_path = try save.getPath(ctx.allocator, ctx.env_map);
+    defer ctx.allocator.free(save_path);
+    var client = try api.Client.init(
+        redirect_uri,
+        &scopes,
+        ctx.io,
+        ctx.allocator,
+        ctx.arena,
+        save_path,
+    );
+    ctx.client = &client; // TODO: unnecessary
     defer client.deinit();
 
     if (std.mem.eql(u8, command, "print")) {
-        return cmd.print.exec(&client, &args);
+        return cmd.print.exec(&ctx);
     } else if (std.mem.eql(u8, command, "play")) {
-        return cmd.play.exec(&client, raw_allocator, args.next());
+        return cmd.play.exec(&ctx);
     } else if (std.mem.eql(u8, command, "pause")) {
-        return cmd.pause.exec(&client);
+        return cmd.pause.exec(&ctx);
     } else if (std.mem.eql(u8, command, "prev")) {
-        return cmd.prev.exec(&client);
+        return cmd.prev.exec(&ctx);
     } else if (std.mem.eql(u8, command, "next")) {
-        return cmd.next.exec(&client);
+        return cmd.next.exec(&ctx);
     } else if (std.mem.eql(u8, command, "repeat")) {
-        return cmd.repeat.exec(&client, args.next());
+        return cmd.repeat.exec(&ctx);
     } else if (std.mem.eql(u8, command, "shuffle")) {
-        return cmd.shuffle.exec(&client, args.next());
+        return cmd.shuffle.exec(&ctx);
     } else if (std.mem.eql(u8, command, "seek")) {
-        return cmd.seek.exec(&client, args.next());
+        return cmd.seek.exec(&ctx);
     } else if (std.mem.eql(u8, command, "vol") or std.mem.eql(u8, command, "volume")) {
-        return cmd.volume.exec(&client, args.next());
+        return cmd.volume.exec(&ctx);
     } else if (std.mem.eql(u8, command, "like")) {
-        return cmd.like.exec(&client);
+        return cmd.like.exec(&ctx);
     } else if (std.mem.eql(u8, command, "queue")) {
-        return cmd.queue.exec(&client);
+        return cmd.queue.exec(&ctx);
     } else if (std.mem.eql(u8, command, "devices")) {
-        return cmd.devices.exec(&client, args.next());
+        return cmd.devices.exec(&ctx);
     } else if (std.mem.eql(u8, command, "transfer")) {
-        return cmd.transfer.exec(&client, args.next());
+        return cmd.transfer.exec(&ctx);
     } else {
-        try cmd.help.exec(command);
+        try cmd.help.exec(&ctx, command);
         std.process.exit(1);
     }
 }

@@ -3,12 +3,12 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const zon = @import("build.zig.zon");
 
 const program_name = "zpotify";
 
-/// Must match the `version` in `build.zig.zon`.
-/// Remove `.pre` when tagging a new release and add it back on the next development cycle.
-const version: std.SemanticVersion = .{ .major = 0, .minor = 5, .patch = 0, .pre = "dev" };
+const version = std.SemanticVersion.parse(zon.version) catch unreachable;
+const minimum_zig_version = std.SemanticVersion.parse(zon.minimum_zig_version) catch unreachable;
 
 const release_targets = [_]std.Target.Query{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },
@@ -19,6 +19,18 @@ const release_targets = [_]std.Target.Query{
 };
 
 pub fn build(b: *std.Build) void {
+    comptime if (builtin.zig_version.order(minimum_zig_version) == .lt) {
+        @compileError(std.fmt.comptimePrint(
+            \\Your Zig version does not meet the minimum build requirement:
+            \\  required Zig version: {[minimum_zig_version]f}
+            \\  actual   Zig version: {[current_version]f}
+            \\
+        , .{
+            .current_version = builtin.zig_version,
+            .minimum_zig_version = minimum_zig_version,
+        }));
+    };
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -162,7 +174,7 @@ fn getVersion(b: *std.Build) std.SemanticVersion {
         "git", "-C", b.pathFromRoot("."), "--git-dir", ".git", "describe", "--match", "*.*.*", "--tags",
     };
     var code: u8 = undefined;
-    const git_describe_untrimmed = b.runAllowFail(argv, &code, .Ignore) catch |err| {
+    const git_describe_untrimmed = b.runAllowFail(argv, &code, .ignore) catch |err| {
         const argv_joined = std.mem.join(b.allocator, " ", argv) catch @panic("OOM");
         std.log.warn(
             \\Failed to run git describe to resolve version: {}
@@ -251,7 +263,7 @@ fn release(b: *std.Build, release_artifacts: []const *std.Build.Step.Compile, re
                 compress_cmd.addFileArg(b.path("README.md"));
             },
             .@"tar.xz" => {
-                compress_cmd.setEnvironmentVariable("PATH", b.graph.env_map.get("PATH") orelse "");
+                compress_cmd.setEnvironmentVariable("PATH", b.graph.environ_map.get("PATH") orelse "");
                 compress_cmd.setEnvironmentVariable("XZ_OPT", "-9");
                 compress_cmd.addArgs(&.{ "tar", "caf" });
                 file_path = compress_cmd.addOutputFileArg(file_name);

@@ -1,43 +1,57 @@
 {
   lib,
-  stdenv,
+  stdenvNoCC,
   callPackage,
   installShellFiles,
   zig,
+  releaseMode ? "safe",
 }:
 let
   fs = lib.fileset;
 in
-stdenv.mkDerivation (finalAttrs: {
+stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "zpotify";
-  # Must match the `version` in `build.zig.zon`.
-  version = "0.5.0-dev";
+  inherit (import ./version.nix lib) version;
 
   src = fs.toSource {
     root = ../.;
     fileset = fs.unions [
       ../src
-      ../vendor
+      ../lib
       ../build.zig
       ../build.zig.zon
     ];
   };
 
-  deps = callPackage ./deps.nix { };
-
-  zigBuildFlags = [
-    "--system"
-    "${finalAttrs.deps}"
-    # "--release=fast"
-    "-Dversion-string=${finalAttrs.version}"
-  ];
-
   nativeBuildInputs = [
     installShellFiles
-    zig.hook
+    zig
   ];
 
-  postInstall = ''
+  configurePhase = ''
+    export ZIG_GLOBAL_CACHE_DIR=$TEMP/.cache
+    PACKAGE_DIR=${callPackage ./deps.nix { }}
+  '';
+
+  buildPhase = ''
+    zig build install \
+      --system $PACKAGE_DIR \
+      --release=${releaseMode} \
+      -Dversion-string=${finalAttrs.version} \
+      --color off \
+      --prefix $out
+  '';
+
+  doCheck = true;
+  checkPhase = ''
+    zig build test \
+      --system $PACKAGE_DIR \
+      -Dversion-string=${finalAttrs.version} \
+      --color off
+  '';
+
+  dontInstall = true;
+  postBuild = ''
     installShellCompletion --cmd zpotify \
       --bash <($out/bin/zpotify completion bash) \
       --zsh <($out/bin/zpotify completion zsh)

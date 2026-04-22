@@ -1,5 +1,6 @@
 const std = @import("std");
 const api = @import("zpotify");
+const cmd = @import("../cmd.zig");
 
 pub const description = "Skip to next track";
 pub const usage =
@@ -9,7 +10,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(client: *api.Client) !void {
+pub fn exec(ctx: *cmd.Context) !void {
     std.log.info("Skipping to next track", .{});
-    try api.player.skipToNext(client);
+    try api.player.skipToNext(ctx.client);
 }
