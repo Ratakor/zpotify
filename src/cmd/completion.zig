@@ -109,6 +109,7 @@ const zsh_completion = blk: {
         \\            _arguments -s "2:commands:(
     ;
     for (decls) |decl| {
+        if (std.mem.eql(u8, decl.name, "Context")) continue;
         str = str ++ (decl.name ++ " ");
     }
     str = str ++ ")\"\n" ++

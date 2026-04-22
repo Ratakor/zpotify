@@ -25,6 +25,7 @@ pub const completion = @import("cmd/completion.zig");
 pub const help = @import("cmd/help.zig");
 pub const version = @import("cmd/version.zig");
 
+// TODO: this is annoying in main, help and completion
 pub const Context = struct {
     io: std.Io,
     allocator: std.mem.Allocator,
