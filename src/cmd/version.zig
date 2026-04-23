@@ -1,6 +1,6 @@
 const std = @import("std");
 const build_options = @import("build_options");
-const cmd = @import("../cmd.zig");
+const Context = @import("../Context.zig");
 
 pub const description = "Display program version";
 pub const usage =
@@ -10,7 +10,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     var stdout_writer = std.Io.File.stdout().writer(ctx.io, &.{});
     const stdout = &stdout_writer.interface;
     try stdout.writeAll(build_options.version_string ++ "\n");

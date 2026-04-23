@@ -1,7 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
-const help = cmd.help;
+const Context = @import("../Context.zig");
+const help = @import("../cmd.zig").help;
 
 pub const description = "Display current track info in a specific format";
 // format options must be kept in sync with completion.zig
@@ -49,7 +49,7 @@ const default_format =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const playback_state = try api.player.getPlaybackState(ctx.client);
 
     var stdout_buffer: [4096]u8 = undefined;
@@ -69,7 +69,7 @@ pub fn exec(ctx: *cmd.Context) !void {
     try stdout.flush();
 }
 
-fn format(ctx: *cmd.Context, writer: *std.Io.Writer, fmt: []const u8, info: api.PlaybackState) !void {
+fn format(ctx: *Context, writer: *std.Io.Writer, fmt: []const u8, info: api.PlaybackState) !void {
     var i: usize = 0;
     while (i < fmt.len) : (i += 1) {
         switch (fmt[i]) {
@@ -146,7 +146,7 @@ fn hexToInt(c: u8) u8 {
     };
 }
 
-fn handleFormatArg(ctx: *cmd.Context, writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackState) !void {
+fn handleFormatArg(ctx: *Context, writer: *std.Io.Writer, arg: []const u8, info: api.PlaybackState) !void {
     if (std.mem.eql(u8, arg, "title")) {
         if (info.item) |track| {
             try writer.print("{s}", .{track.name});

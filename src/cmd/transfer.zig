@@ -1,7 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
-const help = cmd.help;
+const Context = @import("../Context.zig");
+const help = @import("../cmd.zig").help;
 
 pub const description = "Transfer playback to another device";
 pub const usage =
@@ -12,7 +12,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     if (ctx.args.next()) |dev| {
         const devices = try api.player.getDevices(ctx.client);
         for (devices) |device| {

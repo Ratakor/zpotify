@@ -1,5 +1,5 @@
 const std = @import("std");
-const cmd = @import("../cmd.zig");
+const Context = @import("../Context.zig");
 const save = @import("../save.zig");
 
 pub const description = "Remove the stored credentials from the config file";
@@ -10,7 +10,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const save_path = try save.getPath(ctx.allocator, ctx.env_map);
     defer ctx.allocator.free(save_path);
     std.Io.Dir.deleteFileAbsolute(ctx.io, save_path) catch |err| {

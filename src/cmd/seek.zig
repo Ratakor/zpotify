@@ -1,7 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
-const help = cmd.help;
+const Context = @import("../Context.zig");
+const help = @import("../cmd.zig").help;
 
 pub const description = "Get/Set the position of the current track";
 pub const usage =
@@ -51,7 +51,7 @@ const Time = struct {
     }
 };
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     if (ctx.args.next()) |buf| {
         const time = if (buf[0] == '+')
             try parseInputRelative(ctx, buf[1..], .pos)
@@ -85,7 +85,7 @@ pub fn exec(ctx: *cmd.Context) !void {
     }
 }
 
-fn parseUnsigned(ctx: *cmd.Context, buf: []const u8) u32 {
+fn parseUnsigned(ctx: *Context, buf: []const u8) u32 {
     return std.fmt.parseUnsigned(u32, buf, 10) catch |err| {
         std.log.err("Invalid time format: {}", .{err});
         help.exec(ctx, "seek") catch {};
@@ -93,7 +93,7 @@ fn parseUnsigned(ctx: *cmd.Context, buf: []const u8) u32 {
     };
 }
 
-fn parseInputAbsolute(ctx: *cmd.Context, buf: []const u8) Time {
+fn parseInputAbsolute(ctx: *Context, buf: []const u8) Time {
     var min, var sec = blk: {
         const sep = std.mem.indexOfScalar(u8, buf, ':') orelse {
             break :blk .{ 0, parseUnsigned(ctx, buf) };
@@ -107,7 +107,7 @@ fn parseInputAbsolute(ctx: *cmd.Context, buf: []const u8) Time {
     return .{ .min = min, .sec = sec };
 }
 
-fn parseInputRelative(ctx: *cmd.Context, buf: []const u8, sign: enum { pos, neg }) !Time {
+fn parseInputRelative(ctx: *Context, buf: []const u8, sign: enum { pos, neg }) !Time {
     const progress: Time = blk: {
         const playback_state = try api.player.getPlaybackState(ctx.client);
         const progress_ms = playback_state.progress_ms;

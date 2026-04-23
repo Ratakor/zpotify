@@ -1,7 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
-const help = cmd.help;
+const Context = @import("../Context.zig");
+const help = @import("../cmd.zig").help;
 
 pub const description = "Toggle shuffle mode or force it to a specific state";
 pub const usage =
@@ -11,7 +11,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const state = blk: {
         if (ctx.args.next()) |state| {
             if (std.mem.eql(u8, state, "on")) {

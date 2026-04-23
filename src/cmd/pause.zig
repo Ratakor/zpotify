@@ -1,6 +1,6 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
+const Context = @import("../Context.zig");
 
 pub const description = "Toggle pause state";
 pub const usage =
@@ -10,7 +10,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const playback_state = try api.player.getPlaybackState(ctx.client);
 
     if (playback_state.is_playing) {

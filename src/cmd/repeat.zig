@@ -1,7 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
-const help = cmd.help;
+const Context = @import("../Context.zig");
+const help = @import("../cmd.zig").help;
 
 pub const description = "Get/Set repeat mode";
 pub const usage =
@@ -11,7 +11,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     if (ctx.args.next()) |state_str| {
         if (std.meta.stringToEnum(api.RepeatState, state_str)) |state| {
             std.log.info("Setting repeat mode to {t}", .{state});

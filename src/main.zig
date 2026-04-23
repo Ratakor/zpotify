@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const api = @import("zpotify");
 const cmd = @import("cmd.zig");
 const save = @import("save.zig");
+const Context = @import("Context.zig");
 
 pub const axe = @import("axe").Axe(.{});
 
@@ -19,7 +20,6 @@ pub const usage = blk: {
         \\
     ;
     for (std.meta.declarations(cmd)) |decl| {
-        if (std.mem.eql(u8, decl.name, "Context")) continue;
         str = str ++ std.fmt.comptimePrint("  {s: <10}  {s}\n", .{
             decl.name,
             @field(cmd, decl.name).description,
@@ -43,7 +43,7 @@ const scopes = [_]api.Scope{
 };
 
 pub fn main(init: std.process.Init) !void {
-    var ctx: cmd.Context = .{
+    var ctx: Context = .{
         .io = init.io,
         .allocator = init.gpa,
         .arena = init.arena,

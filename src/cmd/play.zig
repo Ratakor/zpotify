@@ -1,7 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
-const help = cmd.help;
+const Context = @import("../Context.zig");
+const help = @import("../cmd.zig").help;
 
 pub const description = "Play a track, playlist, album, or artist from your library";
 pub const usage =
@@ -45,7 +45,7 @@ const Query = enum {
 
 var dmenu_cmd: []const u8 = undefined;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const query = if (ctx.args.next()) |value| blk: {
         break :blk std.meta.stringToEnum(Query, value) orelse {
             std.log.err("Invalid query type: '{s}'", .{value});
@@ -99,7 +99,7 @@ pub fn exec(ctx: *cmd.Context) !void {
 
 fn startPlayback(
     query: Query,
-    ctx: *cmd.Context,
+    ctx: *Context,
     allocator: std.mem.Allocator, // arena allocator
     uri: []const u8,
 ) !void {
@@ -150,7 +150,7 @@ fn startPlayback(
 // this is what zig's polymorphism does to a mf
 fn getItemFromMenu(
     comptime query: Query,
-    ctx: *cmd.Context,
+    ctx: *Context,
     allocator: std.mem.Allocator, // arena allocator
 ) !query.Type() {
     const Node = query.NodeType();
@@ -229,7 +229,7 @@ fn getItemFromMenu(
     }
 }
 
-fn spawnMenu(ctx: *cmd.Context, command: []const u8, items: anytype) ![]const u8 {
+fn spawnMenu(ctx: *Context, command: []const u8, items: anytype) ![]const u8 {
     const T, const nullable = blk: {
         const T = @typeInfo(@TypeOf(items)).pointer.child;
         const ti = @typeInfo(T);

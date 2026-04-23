@@ -1,7 +1,7 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
-const help = cmd.help;
+const Context = @import("../Context.zig");
+const help = @import("../cmd.zig").help;
 
 pub const description = "Get/Set volume";
 pub const usage =
@@ -12,7 +12,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const playback_state = try api.player.getPlaybackState(ctx.client);
 
     var volume = blk: {
@@ -50,7 +50,7 @@ pub fn exec(ctx: *cmd.Context) !void {
     }
 }
 
-fn parseVolume(ctx: *cmd.Context, buf: []const u8) u64 {
+fn parseVolume(ctx: *Context, buf: []const u8) u64 {
     const volume = std.fmt.parseUnsigned(u64, buf, 10) catch |err| {
         std.log.err("Invalid volume: {}", .{err});
         help.exec(ctx, "volume") catch {};

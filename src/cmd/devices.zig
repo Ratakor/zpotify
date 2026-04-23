@@ -1,6 +1,6 @@
 const std = @import("std");
 const api = @import("zpotify");
-const cmd = @import("../cmd.zig");
+const Context = @import("../Context.zig");
 
 pub const description = "List all available devices";
 pub const usage =
@@ -10,7 +10,7 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const devices = try api.player.getDevices(ctx.client);
 
     if (devices.len == 0) {

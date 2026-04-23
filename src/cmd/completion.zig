@@ -1,5 +1,6 @@
 const std = @import("std");
 const cmd = @import("../cmd.zig");
+const Context = @import("../Context.zig");
 
 pub const description = "Generate shell completion script";
 pub const usage =
@@ -23,7 +24,7 @@ const Shell = enum {
     }
 };
 
-pub fn exec(ctx: *cmd.Context) !void {
+pub fn exec(ctx: *Context) !void {
     const shell_str = ctx.args.next() orelse {
         try cmd.help.exec(ctx, "completion");
         std.process.exit(1);
@@ -72,7 +73,6 @@ const zsh_completion = blk: {
         \\        main_commands=('
     ;
     for (decls) |decl| {
-        if (std.mem.eql(u8, decl.name, "Context")) continue;
         str = str ++ (decl.name ++ "\\:\"" ++ @field(cmd, decl.name).description ++ "\" ");
     }
     str = str ++ "')\n" ++
@@ -109,7 +109,6 @@ const zsh_completion = blk: {
         \\            _arguments -s "2:commands:(
     ;
     for (decls) |decl| {
-        if (std.mem.eql(u8, decl.name, "Context")) continue;
         str = str ++ (decl.name ++ " ");
     }
     str = str ++ ")\"\n" ++

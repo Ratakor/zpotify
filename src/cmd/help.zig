@@ -1,6 +1,7 @@
 const std = @import("std");
 const main = @import("../main.zig");
 const cmd = @import("../cmd.zig");
+const Context = @import("../Context.zig");
 
 pub const description = "Display information about a command";
 pub const usage =
@@ -10,14 +11,13 @@ pub const usage =
     \\
 ;
 
-pub fn exec(ctx: *cmd.Context, command: ?[]const u8) !void {
+pub fn exec(ctx: *Context, command: ?[]const u8) !void {
     var buffer: [4096]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(ctx.io, &buffer);
     const stderr = &stderr_writer.interface;
     defer stderr.flush() catch {};
     if (command) |com| {
         inline for (comptime std.meta.declarations(cmd)) |decl| {
-            comptime if (std.mem.eql(u8, decl.name, "Context")) continue;
             if (std.mem.eql(u8, com, decl.name)) {
                 try stderr.writeAll(@field(cmd, decl.name).usage);
                 return;
