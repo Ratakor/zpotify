@@ -1,6 +1,6 @@
 {
   lib,
-  stdenvNoCC,
+  stdenv,
   callPackage,
   installShellFiles,
   zig,
@@ -9,7 +9,7 @@
 let
   fs = lib.fileset;
 in
-stdenvNoCC.mkDerivation (finalAttrs: {
+stdenv.mkDerivation (finalAttrs: {
   pname = "zpotify";
   inherit (import ./version.nix lib) version;
 
